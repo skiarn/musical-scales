@@ -1,0 +1,23 @@
+.audio-button {
+  background-color: #4CAF50; /* Initial stylish color */
+  color: white;
+  padding: 15px 32px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 16px;
+  margin: 4px 2px;
+  cursor: pointer;
+  border: none;
+  border-radius: 12px;
+  transition: background-color 0.3s ease; /* Smooth transition */
+}
+
+.audio-button:active {
+  background-color: red; /* Color when pressed */
+  transition: background-color 0s; /* Disable transition for immediate feedback */
+}
+
+.audio-button:hover {
+  background-color: #45a049; /* Hover color for added effect */
+}
