@@ -1,5 +1,7 @@
 Musical Scales is a next.js app
 
+Visit: https://skiarn.github.io/musical-scales/
+
 ## Getting Started
 
 First, run the development server:

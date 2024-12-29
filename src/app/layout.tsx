@@ -1,4 +1,6 @@
-import type { Metadata } from "next";
+"use client";
+
+// import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,10 +14,10 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Musical Scales App",
-  description: "A Next App project for musical scales",
-};
+// export const metadata: Metadata = {
+//   title: "Musical Scales App",
+//   description: "A Next App project for musical scales",
+// };
 
 export default function RootLayout({
   children,

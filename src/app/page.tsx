@@ -1,3 +1,5 @@
+"use client";
+
 import styles from "./page.module.css";
 import DataView from "./components/DataView";
 

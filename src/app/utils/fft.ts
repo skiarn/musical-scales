@@ -1,3 +1,5 @@
+"use client";
+
 export const computeFFT = (data: { x: number, y: number }[], sampleRate: number) => {
   const N = data.length;
   
