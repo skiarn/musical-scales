@@ -1,18 +1,22 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import AudioButton from './AudioButton';
+import AudioPlayButton from './AudioPlayButton';
 
 interface AudioRecorderProps {
   onStop: (recordedData: Float32Array, sampleRate: number) => void;
 }
 
 const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
   const handleMouseDown = async () => {
+    setAudioUrl(null);
     const AudioContext = window.AudioContext || (window as Window).webkitAudioContext;
     audioContextRef.current = new AudioContext();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -24,6 +28,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
 
     mediaRecorderRef.current.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current);
+      const audioUrl = URL.createObjectURL(audioBlob); 
+      setAudioUrl(audioUrl);
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
       const channelData = audioBuffer.getChannelData(0);
@@ -46,6 +52,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
     audioChunksRef.current = [];
   }
 
+  
   return (
     <div>
       <AudioButton
@@ -55,6 +62,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
         onTouchEnd={handleMouseUp}
       >
       </AudioButton>
+      {audioUrl && <AudioPlayButton audioSrc={audioUrl}></AudioPlayButton> }
     </div>
   );
 };
