@@ -1,13 +1,12 @@
-"use client";
-
 import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 
 interface WaveViewProps {
   data: { x: number, y: number }[];
+  onSelection: (selectedData: { x: number, y: number }[]) => void;
 }
 
-const WaveView: React.FC<WaveViewProps> = ({ data }) => {
+const WaveView: React.FC<WaveViewProps> = ({ data, onSelection }) => {
   const ref = useRef<SVGSVGElement | null>(null);
 
   console.log('data', data)
@@ -50,6 +49,24 @@ const WaveView: React.FC<WaveViewProps> = ({ data }) => {
       .attr('stroke', 'steelblue')
       .attr('stroke-width', 2)
       .attr('d', line);
+
+    // Adding brush to select a range
+    const brush = d3.brushX()
+      .extent([[margin.left, margin.top], [width - margin.right, height - margin.bottom]])
+      .on('end', brushed);
+
+    svg.append('g')
+      .attr('class', 'brush')
+      .call(brush);
+
+    function brushed({ selection }: { selection: [number, number] | null }) {
+      if (selection) {
+        const [x0, x1] = selection.map(d => x.invert(d));
+        console.log('Selected range:', x0, x1);
+        // You can now handle the selected range, e.g., updating state or props
+        onSelection(data.filter(d => d.x >= x0 && d.x <= x1));
+      }
+    }
   }, [data]);
 
   return <svg ref={ref}></svg>;

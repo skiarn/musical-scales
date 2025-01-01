@@ -60,3 +60,13 @@ export const computeFFT = (data: { x: number, y: number }[], sampleRate: number)
     }));
   };
   
+ export const filterFFTData = (fftData: { frequency: number; amplitude: number }[], sampleRate: number, minFreq: number, maxFreq:number) => {
+  const numPoints = fftData.length; 
+  const frequencies = Array.from({ length: numPoints }, (_, i) => i * sampleRate / numPoints); 
+  const filteredData = fftData.filter((_, i) => frequencies[i] >= minFreq && frequencies[i] <= maxFreq);
+
+  return { 
+    frequencies: frequencies.filter(f => f >= minFreq && f <= maxFreq), 
+    amplitudes: filteredData
+  };
+ }

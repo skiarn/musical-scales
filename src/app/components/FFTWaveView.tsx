@@ -1,14 +1,20 @@
-"use client";
-
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import * as d3 from 'd3';
 
 interface FFTWaveViewProps {
   data: { x: number, y: number }[];
 }
 
+interface Marker {
+  x: number;
+  y: number;
+  stuck: boolean;
+}
+
 const FFTWaveView: React.FC<FFTWaveViewProps> = ({ data }) => {
   const ref = useRef<SVGSVGElement | null>(null);
+  const [markers, setMarkers] = useState<Marker[]>([]);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -64,9 +70,115 @@ const FFTWaveView: React.FC<FFTWaveViewProps> = ({ data }) => {
       .attr("transform", "rotate(-90)")
       .text("Amplitude");
 
-  }, [data]);
+    // Adding a cursor with marker
+    const cursor = svg.append('g')
+      .attr('class', 'cursor')
+      .style('display', 'none');
 
-  return <svg ref={ref}></svg>;
+    cursor.append('line')
+      .attr('class', 'cursor-line')
+      .attr('y1', margin.top)
+      .attr('y2', height - margin.bottom)
+      .attr('stroke', 'red')
+      .attr('stroke-width', 1)
+      .attr('pointer-events', 'none');
+
+    const cursorMarker = cursor.append('circle')
+      .attr('class', 'cursor-marker')
+      .attr('r', 5)
+      .attr('fill', 'red')
+      .attr('stroke', 'black')
+      .attr('stroke-width', 1)
+      .attr('pointer-events', 'none');
+
+    const cursorText = cursor.append('text')
+      .attr('class', 'cursor-text')
+      .attr('fill', 'black')
+      .attr('text-anchor', 'start')
+      .attr('dy', '-0.5em');
+
+    svg.on('mousemove', (event) => {
+      const [mouseX] = d3.pointer(event);
+      const xValue = x.invert(mouseX);
+      const closestData = data.reduce((prev, curr) => Math.abs(curr.x - xValue) < Math.abs(prev.x - xValue) ? curr : prev, data[0]);
+      const cursorX = x(closestData.x);
+      const cursorY = y(closestData.y);
+
+      cursor.attr('transform', `translate(${cursorX},0)`);
+      cursorMarker.attr('cy', cursorY);
+      cursorText.attr('x', 10).attr('y', cursorY);
+      cursorText.text(`x: ${closestData.x.toFixed(2)}, y: ${closestData.y.toFixed(2)}`);
+
+      cursor.style('display', 'block');
+    });
+
+    svg.on('mouseout', () => {
+      cursor.style('display', 'none');
+    });
+
+    svg.on('dblclick', () => {
+      const [mouseX] = d3.pointer(event);
+      const xValue = x.invert(mouseX);
+      const closestData = data.reduce((prev, curr) => Math.abs(curr.x - xValue) < Math.abs(prev.x - xValue) ? curr : prev, data[0]);
+      setMarkers([...markers, { ...closestData, stuck: false }]);
+    });
+
+    markers.forEach((marker, index) => {
+      const markerGroup = svg.append<SVGGElement>('g')
+        .attr('class', `marker-${index}`)
+        .attr('transform', `translate(${x(marker.x)},0)`)
+        .on('click', () => {
+          if (!marker.stuck) setDraggingIndex(index);
+        })
+        .on('dblclick', () => {
+          setMarkers(markers.map((m, i) => i === index ? { ...m, stuck: !m.stuck } : m));
+        });
+
+      if (!marker.stuck && draggingIndex === index) {
+        markerGroup.call(
+          d3.drag<SVGGElement, unknown>()
+            .on('drag', (event) => {
+              const [mouseX] = d3.pointer(event);
+              const xValue = x.invert(mouseX);
+              const closestData = data.reduce((prev, curr) => Math.abs(curr.x - xValue) < Math.abs(prev.x - xValue) ? curr : prev, data[0]);
+              setMarkers(markers.map((m, i) => i === index ? { ...closestData, stuck: m.stuck } : m));
+            })
+            .on('end', () => setDraggingIndex(null))
+        );
+      }
+
+      markerGroup.append('line')
+        .attr('class', 'cursor-line')
+        .attr('y1', margin.top)
+        .attr('y2', height - margin.bottom)
+        .attr('stroke', 'red')
+        .attr('stroke-width', 1);
+
+      markerGroup.append('circle')
+        .attr('class', 'cursor-marker')
+        .attr('r', 5)
+        .attr('fill', 'red')
+        .attr('stroke', 'black')
+        .attr('stroke-width', 1)
+        .attr('cy', y(marker.y));
+
+      markerGroup.append('text')
+        .attr('class', 'cursor-text')
+        .attr('fill', 'black')
+        .attr('text-anchor', 'start')
+        .attr('x', 10)
+        .attr('y', y(marker.y))
+        .attr('dy', '-0.5em')
+        .text(`x: ${marker.x.toFixed(2)}, y: ${marker.y.toFixed(2)}`);
+    });
+
+  }, [data, markers, draggingIndex]);
+
+  return (
+    <div>
+      <svg ref={ref}></svg>
+    </div>
+  );
 };
 
 export default FFTWaveView;
