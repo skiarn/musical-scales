@@ -3,6 +3,7 @@
 import React, { useRef, useState } from 'react';
 import AudioButton from './AudioButton';
 import AudioPlayButton from './AudioPlayButton';
+import AudioLoadNoteButton from './AudioLoadNoteButton';
 
 interface AudioRecorderProps {
   onStop: (recordedData: Float32Array, sampleRate: number) => void;
@@ -63,6 +64,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
       >
       </AudioButton>
       {audioUrl && <AudioPlayButton audioSrc={audioUrl}></AudioPlayButton> }
+      <AudioLoadNoteButton onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadNoteButton>
     </div>
   );
 };

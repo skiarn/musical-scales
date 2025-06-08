@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import * as d3 from 'd3';
 
 interface FFTWaveViewProps {
@@ -15,6 +15,23 @@ const FFTWaveView: React.FC<FFTWaveViewProps> = ({ data }) => {
   const ref = useRef<SVGSVGElement | null>(null);
   const [markers, setMarkers] = useState<Marker[]>([]);
   const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  const calculateNoiseLevel = useMemo(() => {
+    if (!data.length) return 0;
+    // Sort amplitudes and take the median of the lower 20% as noise floor
+    const sortedAmplitudes = [...data].sort((a, b) => a.y - b.y);
+    const lowerQuintileIndex = Math.floor(data.length * 0.2);
+    const lowerQuintile = sortedAmplitudes.slice(0, lowerQuintileIndex);
+    return lowerQuintile.reduce((sum, point) => sum + point.y, 0) / lowerQuintile.length;
+  }, [data]);
+
+  const formatValue = (value: number, noiseLevel: number) => {
+    // Determine number of decimal places based on noise level
+    const decimalPlaces = noiseLevel < 0.001 ? 6 : 
+                         noiseLevel < 0.01 ? 4 : 
+                         noiseLevel < 0.1 ? 3 : 2;
+    return value.toFixed(decimalPlaces);
+  };
 
   useEffect(() => {
     if (!ref.current) return;
@@ -100,14 +117,17 @@ const FFTWaveView: React.FC<FFTWaveViewProps> = ({ data }) => {
     svg.on('mousemove', (event) => {
       const [mouseX] = d3.pointer(event);
       const xValue = x.invert(mouseX);
-      const closestData = data.reduce((prev, curr) => Math.abs(curr.x - xValue) < Math.abs(prev.x - xValue) ? curr : prev, data[0]);
+      const closestData = data.reduce((prev, curr) => 
+        Math.abs(curr.x - xValue) < Math.abs(prev.x - xValue) ? curr : prev, data[0]);
       const cursorX = x(closestData.x);
       const cursorY = y(closestData.y);
 
       cursor.attr('transform', `translate(${cursorX},0)`);
       cursorMarker.attr('cy', cursorY);
       cursorText.attr('x', 10).attr('y', cursorY);
-      cursorText.text(`x: ${closestData.x.toFixed(2)}, y: ${closestData.y.toFixed(2)}`);
+      cursorText.text(
+        `Freq: ${formatValue(closestData.x, 0.1)} Hz, Amp: ${formatValue(closestData.y, calculateNoiseLevel)}`
+      );
 
       cursor.style('display', 'block');
     });
@@ -169,14 +189,19 @@ const FFTWaveView: React.FC<FFTWaveViewProps> = ({ data }) => {
         .attr('x', 10)
         .attr('y', y(marker.y))
         .attr('dy', '-0.5em')
-        .text(`x: ${marker.x.toFixed(2)}, y: ${marker.y.toFixed(2)}`);
+        .text(
+          `Freq: ${formatValue(marker.x, 0.1)} Hz, Amp: ${formatValue(marker.y, calculateNoiseLevel)}`
+        );
     });
 
-  }, [data, markers, draggingIndex]);
+  }, [data, markers, draggingIndex, calculateNoiseLevel]);
 
   return (
     <div>
       <svg ref={ref}></svg>
+      <div className="noise-info">
+        <small>Noise Level: {formatValue(calculateNoiseLevel, calculateNoiseLevel)}</small>
+      </div>
     </div>
   );
 };

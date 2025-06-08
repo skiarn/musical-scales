@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
 
 interface WaveViewProps {
@@ -9,11 +9,14 @@ interface WaveViewProps {
 const WaveView: React.FC<WaveViewProps> = ({ data, onSelection }) => {
   const ref = useRef<SVGSVGElement | null>(null);
 
-  console.log('data', data)
-  useEffect(() => {
-    if (!ref.current) return;
+  // Memoize data length to check for changes
+  const dataSignature = useMemo(() => ({
+    length: data.length,
+    firstX: data[0]?.x,
+    lastX: data[data.length - 1]?.x
+  }), [data.length, data[0]?.x, data[data.length - 1]?.x]);
 
-    const svg = d3.select(ref.current);
+  const drawChart = React.useCallback((svg: d3.Selection<SVGSVGElement, unknown, null, undefined>, data: { x: number, y: number }[]) => {
     const width = 800;
     const height = 400;
     const margin = { top: 20, right: 20, bottom: 30, left: 50 };
@@ -67,9 +70,15 @@ const WaveView: React.FC<WaveViewProps> = ({ data, onSelection }) => {
         onSelection(data.filter(d => d.x >= x0 && d.x <= x1));
       }
     }
-  }, [data]);
+  }, [onSelection]);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const svg = d3.select(ref.current);
+    drawChart(svg, data);
+  }, [dataSignature, drawChart]); // Only redraw when data signature changes
 
   return <svg ref={ref}></svg>;
 };
 
-export default WaveView;
+export default React.memo(WaveView); // Add memo to prevent unnecessary parent renders

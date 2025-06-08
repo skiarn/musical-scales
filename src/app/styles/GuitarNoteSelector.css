@@ -1,0 +1,32 @@
+.guitar-fretboard {
+  margin: 20px 0;
+  padding: 10px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.guitar-fretboard svg {
+  display: block;
+  margin: 0 auto;
+}
+
+.guitar-fretboard g:hover circle {
+  fill: #e0e0e0;
+}
+
+.note-highlight {
+  animation: fadeInOut 0.5s ease-in-out;
+}
+
+@keyframes fadeInOut {
+  0% {
+    fill-opacity: 0.3;
+  }
+  50% {
+    fill-opacity: 1;
+  }
+  100% {
+    fill-opacity: 0.3;
+  }
+}

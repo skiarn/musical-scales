@@ -1,0 +1,43 @@
+.guitar-note-analyzer {
+  margin: 20px;
+  padding: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.guitar-note-analyzer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.guitar-note-analyzer th,
+.guitar-note-analyzer td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.guitar-note-analyzer th {
+  background-color: #f5f5f5;
+  font-weight: bold;
+}
+
+.guitar-note-analyzer tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+.guitar-note-analyzer tr:hover {
+  background-color: #f0f0f0;
+}
+
+.noise-info {
+  margin-bottom: 10px;
+  color: #666;
+  font-style: italic;
+}
+
+.guitar-note-analyzer table td:last-child {
+  color: #0066cc;
+  font-weight: 500;
+}

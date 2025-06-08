@@ -1,13 +1,19 @@
 "use client";
 
+import { applyMovingAverage, applyHanningWindow } from './signal-processing';
+
 export const computeFFT = (data: { x: number, y: number }[], sampleRate: number) => {
-  const N = data.length;
-  
+  // Pre-process the signal
+  const smoothedData = applyMovingAverage(data, 3);
+  const windowedData = applyHanningWindow(smoothedData);
+
+  const N = windowedData.length;
+
   // Find the next power of 2
   const paddedLength = 2 ** Math.ceil(Math.log2(N));
 
   // Pad the real part with zeros
-  const real = new Array(paddedLength).fill(0).map((_, i) => i < N ? data[i].y : 0);
+  const real = new Array(paddedLength).fill(0).map((_, i) => i < N ? windowedData[i].y : 0);
   const imag = new Array(paddedLength).fill(0);
 
   const fft = (real: number[], imag: number[]) => {
@@ -52,21 +58,22 @@ export const computeFFT = (data: { x: number, y: number }[], sampleRate: number)
   return fftData.slice(0, N / 2); // Return the first N / 2 elements
 };
 
-  
-  export const transformFFTData = (dataFFT: { frequency: number; amplitude: number }[]) => {
-    return dataFFT.map(d => ({
-      x: d.frequency,
-      y: d.amplitude,
-    }));
-  };
-  
- export const filterFFTData = (fftData: { frequency: number; amplitude: number }[], sampleRate: number, minFreq: number, maxFreq:number) => {
-  const numPoints = fftData.length; 
-  const frequencies = Array.from({ length: numPoints }, (_, i) => i * sampleRate / numPoints); 
-  const filteredData = fftData.filter((_, i) => frequencies[i] >= minFreq && frequencies[i] <= maxFreq);
+export const transformFFTData = (dataFFT: { frequency: number; amplitude: number }[]) => {
+  return dataFFT.map(d => ({
+    x: d.frequency,
+    y: d.amplitude,
+  }));
+};
 
-  return { 
-    frequencies: frequencies.filter(f => f >= minFreq && f <= maxFreq), 
+export const filterFFTData = (fftData: { frequency: number; amplitude: number }[], sampleRate: number, minFreq: number, maxFreq: number) => {
+  // Direct filtering on the fftData using frequency property
+  const filteredData = fftData.filter(point => 
+    point.frequency >= minFreq && point.frequency <= maxFreq
+  );
+
+  return {
+    frequencies: filteredData.map(point => point.frequency),
     amplitudes: filteredData
   };
- }
+};
+

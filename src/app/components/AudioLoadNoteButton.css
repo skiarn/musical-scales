@@ -1,0 +1,53 @@
+.audio-load-note-button {
+    background-color: #4CAF50; /* Initial stylish color */
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border: none;
+    border-radius: 12px;
+    transition: background-color 0.3s ease; /* Smooth transition */
+  }
+  
+  .audio-load-note-button:active {
+    background-color: red; /* Color when pressed */
+    transition: background-color 0s; /* Disable transition for immediate feedback */
+  }
+  
+  .audio-load-note-button:hover {
+    background-color: #45a049; /* Hover color for added effect */
+  }
+  
+  .audio-load-note-button::after {
+    content: '';
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: auto;
+    border: 3px solid transparent;
+    border-top-color: #ffffff;
+    border-radius: 50%;
+    animation: button-loading-spinner 1s ease infinite;
+  }
+  
+  @keyframes button-loading-spinner {
+    from {
+      transform: rotate(0turn);
+    }
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  .audio-load-note-button.loading {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
