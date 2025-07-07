@@ -1,9 +1,15 @@
+// Add proper type for WebKit prefix
+interface WebkitWindow extends Window {
+  webkitAudioContext: typeof AudioContext;
+}
+
 // Add a singleton audio context manager
 let audioContextInstance: AudioContext | null = null;
 
 function getAudioContext(): AudioContext {
   if (!audioContextInstance || audioContextInstance.state === 'closed') {
-    audioContextInstance = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const AudioContextClass = window.AudioContext || (window as unknown as WebkitWindow).webkitAudioContext;
+    audioContextInstance = new AudioContextClass();
   }
   return audioContextInstance;
 }

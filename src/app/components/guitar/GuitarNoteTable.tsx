@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { guitarNotes, GuitarNote } from '../utils/guitar-frequencies';
+import { guitarNotes, GuitarNote } from '../../utils/guitar-frequencies';
 
 interface GuitarNoteTableProps {
   highlightFrequencies?: number[];  // Frequencies to highlight

@@ -1,29 +1,27 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import WaveView from "./WaveView";
-import { SineWaveData } from "./SineWaveData";
-import AudioRecorder from "./AudioRecorder";
-import FFTView from "./FFTWaveView";
+import WaveView, { FuncFilter, FuncZoom } from "./visualization/WaveView";
+import AudioRecorder from "./audio/AudioRecorder";
+import FFTView from "./visualization/FFTWaveView";
 import "./DataView.css";
-import { computeFFT, transformFFTData, filterFFTData } from "../utils/fft";
-import FrequencyBandAnalysis from "./FrequencyBandAnalysis";
-import { GuitarSection } from "./GuitarSection";
-import FrequencyFilter from "./FrequencyFilter";
-import FrequencyAnalyzer from "./FrequencyAnalyzer";
-import GuitarNoteTable from "./GuitarNoteTable";
+import { computeFFT, transformFFTData } from "../utils/fft";
+import { GuitarSection } from "./guitar/GuitarSection";
+import FrequencyFilter from "./filters/FrequencyFilter";
+import FrequencyAnalyzer from "./analysis/FrequencyAnalyzer";
 
-const DataView: React.FC = () => {
-  const DEFAULT_SAMPLE_RATE = 800;
-  const DEFAULT_MIN_FREQ = 0;
-  const DEFAULT_MAX_FREQ = DEFAULT_SAMPLE_RATE / 2; // Nyquist frequency
+interface DataViewProps {
+  data: { x: number; y: number }[];
+  sampleRate: number;
+  setNewData: (data: { x: number; y: number }[], sampleRate: number) => void;
+  onWindowFilterChange: (window: string, enabled: boolean, funcWindow: FuncFilter<{ x: number; y: number }>) => void;
+  onZoomChange?: (reset: boolean, from: number, to: number, funcZoom: FuncZoom<{ x: number; y: number }>) => void;
+}
 
-  const [data, setData] = useState<{ x: number; y: number }[]>([]);
-  const [sampleRate, setSampleRate] = useState(DEFAULT_SAMPLE_RATE);
+const DataView: React.FC <DataViewProps> = ({ data, sampleRate, setNewData, onWindowFilterChange, onZoomChange }) => {
+const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
+
   const [dataFFT, setDataFFT] = useState<{ x: number; y: number }[]>([]);
-  const [minFreq, setMinFreq] = useState(DEFAULT_MIN_FREQ);
   const [maxFreq, setMaxFreq] = useState(DEFAULT_MAX_FREQ);
-  const [defaultMaxFreq, setDefaultMaxFreq] = useState(DEFAULT_MAX_FREQ);
-  const [isFiltering, setIsFiltering] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [minFreq, setMinFreq] = useState(0);
 
   const worker = useMemo(() => {
     if (typeof Window !== "undefined") {
@@ -35,23 +33,25 @@ const DataView: React.FC = () => {
     if (!worker) return;
 
     worker.onmessage = (e) => {
-      setDataFFT(transformFFTData(e.data.amplitudes));
-      setIsProcessing(false);
+      setDataFFT(transformFFTData(e.data.filteredFFT.amplitudes));
     };
 
     return () => worker.terminate();
   }, [worker]);
 
-  const handleDataGenerated = useCallback(
-    (
-      data: { x: number; y: number }[],
-      fftData: { frequency: number; amplitude: number }[]
-    ) => {
-      setData(data);
-      setDataFFT(transformFFTData(fftData));
-    },
-    []
-  );
+  useEffect(() => {
+    if (data.length > 0) {
+      const fftData = computeFFT(data, sampleRate);
+      if (fftData.length === 0) {
+        console.warn("FFT data is empty. Ensure that the input data is valid.");
+        return;
+      }
+      setMaxFreq(fftData[fftData.length - 1].frequency);
+      const fft = transformFFTData(fftData);
+      setDataFFT(fft);
+    }
+  }, [data, sampleRate]);
+
 
   const handleAudioStop = (channelData: Float32Array, sampleRate: number) => {
     console.log(
@@ -64,73 +64,40 @@ const DataView: React.FC = () => {
       x: index / sampleRate,
       y: value,
     }));
-    setSampleRate(sampleRate);
-    const fftData = computeFFT(audioData, sampleRate);
-    setData(audioData);
-    setDefaultMaxFreq(fftData[fftData.length - 1].frequency);
-    setMaxFreq(fftData[fftData.length - 1].frequency);
-    setDataFFT(transformFFTData(fftData));
+    
+    setNewData(audioData, sampleRate); 
   };
 
-  const handleOnSelection = (selectedData: { x: number; y: number }[]) => {
-    const fftData = computeFFT(selectedData, sampleRate);
-    setDataFFT(transformFFTData(fftData));
-  };
 
-  const handleMinFreqChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Number(e.target.value);
-    if (value >= 0 && value < maxFreq) {
-      setMinFreq(value);
-    }
-  };
-
-  const handleMaxFreqChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = Number(e.target.value);
-      if (value > minFreq && value <= defaultMaxFreq) {
-        setMaxFreq(value);
-      }
-    },
-    [minFreq, defaultMaxFreq]
-  );
-
-  const handleFilterChange = async () => {
-    setIsFiltering(true);
-    try {
-      // Wrap in setTimeout to allow UI to update
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const fftData = computeFFT(data, sampleRate);
-      const filteredFFT = filterFFTData(fftData, sampleRate, minFreq, maxFreq);
-      setDataFFT(transformFFTData(filteredFFT.amplitudes));
-    } finally {
-      setIsFiltering(false);
-    }
-  };
-
-  const filterChange = useCallback((fftData: { x: number; y: number }[]) => {
-    setDataFFT(fftData);
+  const filterChange = useCallback((_fftData: { x: number; y: number }[], min: number, max:number) => {
+    setMaxFreq(max);
+    setMinFreq(min);
   }, []);
 
   return (
     <div>
       <h1>Wave Plot</h1>
-      <SineWaveData
-        points={DEFAULT_SAMPLE_RATE}
-        amplitude={1}
-        frequency={10}
-        sampleRate={DEFAULT_SAMPLE_RATE}
-        onDataGenerated={handleDataGenerated}
-      />
-      <WaveView data={data} onSelection={handleOnSelection} />
+       <WaveView data={data}
+       onZoom={(reset, from, to, funcZoom) => {
+        console.log("Zoom function applied");
+        if (onZoomChange) {
+          onZoomChange(reset, from, to, funcZoom);
+        }
+       }}
+       onFilter={(window, enabled, funcWindow) => {
+        console.log("Filter applied");
+        onWindowFilterChange(window, enabled, funcWindow);
+       }} options={{filter: {windows: ["hanning"]}}}/>
       <FrequencyFilter
-        defaultMaxFreq={defaultMaxFreq}
+        defaultMaxFreq={DEFAULT_MAX_FREQ}
         data={data}
         sampleRate={sampleRate}
         onFilterChange={filterChange}
       ></FrequencyFilter>
 
       <h1>FFT Plot</h1>
-      <FFTView data={dataFFT} />
+      <span>Min:{minFreq} Max:{maxFreq}</span>
+      <FFTView data={dataFFT.slice(minFreq, maxFreq)} />
 
       <FrequencyAnalyzer
         fftData={dataFFT}

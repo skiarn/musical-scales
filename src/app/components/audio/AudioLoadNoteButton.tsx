@@ -2,7 +2,7 @@
 
 import React from 'react';
 import './AudioLoadNoteButton.css';
-import { generateGNoteBlob } from '../utils/guitar-sample-generator';
+import { generateGNoteBlob } from '../../utils/guitar-sample-generator';
 
 interface AudioLoadNoteButtonProps {
     onStop: (recordedData: Float32Array, sampleRate: number) => void;

@@ -1,11 +1,11 @@
 import React, { useCallback, useState, useEffect } from 'react';
-import { computeFFT, filterFFTData, transformFFTData } from '../utils/fft';
+import { transformFFTData } from '../../utils/fft';
 
 interface FrequencyFilterProps {
   defaultMaxFreq: number;
   data: { x: number, y: number }[];
   sampleRate: number;
-  onFilterChange: (fftData: { x: number, y: number }[]) => void;
+  onFilterChange: (fftData: { x: number, y: number }[], min: number, max: number) => void;
 }
 
 const FrequencyFilter: React.FC<FrequencyFilterProps> = ({
@@ -16,12 +16,11 @@ const FrequencyFilter: React.FC<FrequencyFilterProps> = ({
 }) => {
   const [minFreq, setMinFreq] = useState(0);
   const [maxFreq, setMaxFreq] = useState(defaultMaxFreq);
-  const [isFiltering, setIsFiltering] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const worker = React.useMemo(() => {
     if (typeof Window !== 'undefined') {
-      return new Worker(new URL('../workers/fft.worker.ts', import.meta.url));
+      return new Worker(new URL('../../workers/fft.worker.ts', import.meta.url));
     }
   }, []);
 
@@ -30,9 +29,8 @@ const FrequencyFilter: React.FC<FrequencyFilterProps> = ({
 
     worker.onmessage = (e) => {
       console.log('FFT worker response:', e.data);
-      onFilterChange(transformFFTData(e.data.amplitudes));
+      onFilterChange(transformFFTData(e.data.filteredFFT.amplitudes), e.data.minFreq, e.data.maxFreq);
       setIsProcessing(false);
-      setIsFiltering(false);
     };
 
     return () => worker.terminate();
@@ -50,17 +48,19 @@ const FrequencyFilter: React.FC<FrequencyFilterProps> = ({
     if (value > minFreq && value <= defaultMaxFreq) {
       setMaxFreq(value);
     }
-  }, [minFreq, defaultMaxFreq, data, sampleRate, worker]);
+  }, [minFreq, defaultMaxFreq]);
 
-  const handleFilterClick = async () => {
-    setIsFiltering(true);
+  const handleFilterClick = (min: number, max: number) => {
+
+    console.log('Applying filter with minFreq:', min, 'maxFreq:', max);
+    if (isProcessing) return;
 
     setIsProcessing(true);
       worker?.postMessage({
         data,
         sampleRate,
-        minFreq,
-        maxFreq: maxFreq,
+        minFreq: min,
+        maxFreq: max,
       });
 
     //try {
@@ -100,11 +100,11 @@ const FrequencyFilter: React.FC<FrequencyFilterProps> = ({
           <span>{maxFreq} Hz {isProcessing && '(Processing...)'}</span>
         </label>
         <button 
-          className={`button-apply ${isFiltering ? 'loading' : ''}`}
-          disabled={isFiltering}
-          onClick={handleFilterClick}
+          className={`button-apply ${isProcessing ? 'loading' : ''}`}
+          disabled={isProcessing}
+          onClick={() => handleFilterClick(minFreq, maxFreq)}
         >
-          {isFiltering ? 'Filtering...' : 'Apply Filter'}
+          {isProcessing ? 'Filtering...' : 'Apply Filter'}
         </button>
       </div>
     </div>

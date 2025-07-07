@@ -1,5 +1,6 @@
 import React from 'react';
-import { guitarNotes, GuitarNote } from '../utils/guitar-frequencies';
+import { guitarNotes, GuitarNote } from '../../utils/guitar-frequencies';
+import './GuitarNoteSelector.css';
 
 interface GuitarNoteSelectorProps {
   selectedNotes?: GuitarNote[];

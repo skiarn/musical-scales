@@ -1,19 +1,25 @@
 import React from 'react';
+import './DataTable.css';
 
-interface Column<T> {
+export interface Column<T extends DataRecord> {
   header: string;
-  key: string;
-  render?: (item: T) => React.ReactNode;
+  key: keyof T;  // Ensure key is a valid property of T
+  render?: (item: T) => string | number | React.ReactNode;
 }
 
-interface DataTableProps<T> {
+// Create a base type for data objects
+export interface DataRecord {
+  [key: string]: string | number | boolean | null | undefined | Array<string | number>;
+}
+
+interface DataTableProps<T extends DataRecord> {  // Ensure T is an object type
   data: T[];
   columns: Column<T>[];
   title?: string;
   className?: string;
 }
 
-function DataTable<T>({ data, columns, title, className = '' }: DataTableProps<T>) {
+function DataTable<T extends DataRecord>({ data, columns, title, className = '' }: DataTableProps<T>) {
   return (
     <div className={`data-table ${className}`}>
       {title && <h3>{title}</h3>}
@@ -33,7 +39,7 @@ function DataTable<T>({ data, columns, title, className = '' }: DataTableProps<T
                   <td key={`${rowIndex}-${colIndex}`}>
                     {column.render 
                       ? column.render(item)
-                      : (item as any)[column.key]}
+                      : item[column.key]}
                   </td>
                 ))}
               </tr>
@@ -41,31 +47,6 @@ function DataTable<T>({ data, columns, title, className = '' }: DataTableProps<T
           </tbody>
         </table>
       </div>
-      <style jsx>{`
-        .data-table {
-          margin: 20px 0;
-        }
-        .table-container {
-          max-width: 100%;
-          margin-top: 10px;
-          overflow-x: auto;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        td, th {
-          border: 1px solid #ddd;
-          padding: 8px;
-          text-align: left;
-        }
-        th {
-          background-color: #f5f5f5;
-        }
-        tr:nth-child(even) {
-          background-color: #fafafa;
-        }
-      `}</style>
     </div>
   );
 }

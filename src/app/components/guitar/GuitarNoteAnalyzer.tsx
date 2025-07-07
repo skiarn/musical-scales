@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
-import { guitarNotes, GuitarNote } from '../utils/guitar-frequencies';
+import React, { useMemo, useCallback } from 'react';
+import { guitarNotes, GuitarNote } from '../../utils/guitar-frequencies';
+import './GuitarNoteAnalyzer.css';
 
 interface GuitarNoteAnalyzerProps {
   fftData: { x: number; y: number }[];
@@ -20,6 +21,28 @@ const GuitarNoteAnalyzer: React.FC<GuitarNoteAnalyzerProps> = ({
   frequencyTolerance: defaultTolerance = 5,
   maxNotesToShow = 6
 }) => {
+
+   // Calculate optimal parameters based on the data
+   const parameters = useMemo(() => {
+    if (fftData.length === 0) return { snr: defaultSNR, tolerance: defaultTolerance };
+
+    // Calculate dynamic SNR based on peak to noise ratio
+    const sortedAmplitudes = [...fftData].sort((a, b) => b.y - a.y);
+    const maxAmplitude = sortedAmplitudes[0].y;
+    const noiseLevel = calculateNoiseFloor(fftData);
+    const peakToNoise = maxAmplitude / noiseLevel;
+    const dynamicSNR = Math.max(2, Math.min(peakToNoise * 0.3, 5));
+
+    // Calculate frequency tolerance based on frequency resolution
+    const freqResolution = fftData[1]?.x - fftData[0]?.x || 1;
+    const dynamicTolerance = Math.max(freqResolution * 2, Math.min(10, freqResolution * 4));
+
+    return {
+      snr: dynamicSNR,
+      tolerance: dynamicTolerance
+    };
+  }, [fftData, defaultSNR, defaultTolerance]);
+
   const calculateNoiseFloor = (data: { x: number; y: number }[]): number => {
     if (data.length === 0) return 0;
     
@@ -40,7 +63,7 @@ const GuitarNoteAnalyzer: React.FC<GuitarNoteAnalyzerProps> = ({
     return Math.abs(ratio - nearestHarmonic) < (tolerance / freq2) && nearestHarmonic > 1;
   };
 
-  const findHarmonics = (frequency: number, peaks: { x: number, y: number }[], noiseFloor: number): number[] => {
+  const findHarmonics = useCallback((frequency: number, peaks: { x: number, y: number }[], noiseFloor: number): number[] => {
     const maxHarmonic = 5; // Only check up to 5th harmonic
     const harmonics: number[] = [];
     
@@ -62,28 +85,7 @@ const GuitarNoteAnalyzer: React.FC<GuitarNoteAnalyzerProps> = ({
     }
     
     return harmonics;
-  };
-
-  // Calculate optimal parameters based on the data
-  const parameters = useMemo(() => {
-    if (fftData.length === 0) return { snr: defaultSNR, tolerance: defaultTolerance };
-
-    // Calculate dynamic SNR based on peak to noise ratio
-    const sortedAmplitudes = [...fftData].sort((a, b) => b.y - a.y);
-    const maxAmplitude = sortedAmplitudes[0].y;
-    const noiseLevel = calculateNoiseFloor(fftData);
-    const peakToNoise = maxAmplitude / noiseLevel;
-    const dynamicSNR = Math.max(2, Math.min(peakToNoise * 0.3, 5));
-
-    // Calculate frequency tolerance based on frequency resolution
-    const freqResolution = fftData[1]?.x - fftData[0]?.x || 1;
-    const dynamicTolerance = Math.max(freqResolution * 2, Math.min(10, freqResolution * 4));
-
-    return {
-      snr: dynamicSNR,
-      tolerance: dynamicTolerance
-    };
-  }, [fftData, defaultSNR, defaultTolerance]);
+  }, [parameters]);
 
   const playedNotes = useMemo(() => {
     const candidateNotes: NoteWithConfidence[] = [];
@@ -140,7 +142,7 @@ const GuitarNoteAnalyzer: React.FC<GuitarNoteAnalyzerProps> = ({
       .filter(note => !note.isHarmonic)
       .sort((a, b) => b.confidence - a.confidence)
       .slice(0, maxNotesToShow);
-  }, [fftData, parameters, maxNotesToShow]);
+  }, [fftData, parameters, maxNotesToShow, findHarmonics]);
 
   const noiseFloor = useMemo(() => calculateNoiseFloor(fftData), [fftData]);
 

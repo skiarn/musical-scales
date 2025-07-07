@@ -1,9 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
-import GuitarNoteAnalyzer from "./GuitarNoteTable";
 import GuitarNoteSelector from "./GuitarNoteSelector";
-import { guitarNotes, GuitarNote } from "../utils/guitar-frequencies";
+import { guitarNotes, GuitarNote } from "../../utils/guitar-frequencies";
 import GuitarNoteTable from "./GuitarNoteTable";
-import { analyzeFrequencies } from "../utils/signal-processing";
+import { analyzeFrequencies } from "../../utils/signal-processing";
 
 // Add helper function to find closest guitar note
 const findClosestGuitarNote = (frequency: number): GuitarNote => {

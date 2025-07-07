@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react';
-import { TimeSeriesPoint, findPeaks, findHarmonics, FrequencyPeak, analyzeFrequencies } from '../utils/signal-processing';
-import DataTable from './DataTable';
+import React from 'react';
+import { TimeSeriesPoint, FrequencyPeak, analyzeFrequencies } from '../../utils/signal-processing';
+import DataTable, { DataRecord, Column } from '../DataTable';
+
+// Ensure FrequencyPeak implements DataRecord
+interface FrequencyPeakRecord extends FrequencyPeak, DataRecord {}
 
 interface FrequencyAnalyzerProps {
   fftData: TimeSeriesPoint[];
@@ -41,7 +44,7 @@ const FrequencyAnalyzer: React.FC<FrequencyAnalyzerProps> = ({
     }
   );
 
-  const columns = [
+  const columns: Column<FrequencyPeakRecord>[] = [
     {
       header: 'Frequency (Hz)',
       key: 'frequency',
@@ -83,8 +86,8 @@ const FrequencyAnalyzer: React.FC<FrequencyAnalyzerProps> = ({
         </small>
       </div>
 
-      <DataTable
-        data={analysisResult.peaks}
+      <DataTable<FrequencyPeakRecord>
+        data={analysisResult.peaks as FrequencyPeakRecord[]}
         columns={columns}
         title="Frequency Analysis"
         className="frequency-table"

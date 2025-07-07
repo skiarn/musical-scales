@@ -9,11 +9,16 @@ const AudioPlayButton: React.FC<AudioPlayButtonProps> = ({ audioSrc }) => {
   const [audio] = useState(new Audio(audioSrc));
 
   useEffect(() => {
+    const handleEnded = () => {
+      setIsPlaying(false);
+      audio.currentTime = 0; // Ensure the audio is reset to the beginning
+    };
+
     audio.addEventListener('ended', handleEnded);
     return () => {
       audio.removeEventListener('ended', handleEnded);
     };
-  }, []);
+  }, [audio]);
 
   const togglePlay = () => {
     if (isPlaying) {
@@ -23,11 +28,6 @@ const AudioPlayButton: React.FC<AudioPlayButtonProps> = ({ audioSrc }) => {
       audio.play();
     }
     setIsPlaying(!isPlaying);
-  };
-
-  const handleEnded = () => {
-    setIsPlaying(false);
-    audio.currentTime = 0; // Ensure the audio is reset to the beginning
   };
 
   return (

@@ -51,6 +51,7 @@ export const detectTrend = (energies: number[], threshold: number): 'increasing'
 };
 
 export interface FrequencyPeak {
+  [key: string]: number | number[] | string; // Add index signature
   frequency: number;
   amplitude: number;
   harmonics: number[];
@@ -82,14 +83,14 @@ export const findPeaks = (
   maxFrequency: number = 20000
 ): FrequencyPeak[] => {
   const noiseFloor = calculateNoiseFloor(fftData);
-  const maxAmplitude = Math.max(...fftData.map(p => p.y));
+  //const maxAmplitude = Math.max(...fftData.map(p => p.y));
   
   // Adjust threshold for better harmonic detection
-  const getThreshold = (freq: number) => {
-    // Lower threshold for potential harmonics
-    const freqFactor = Math.min(1, freq / 1000);
-    return noiseFloor * (2 + freqFactor); // Linear threshold with frequency
-  };
+//   const getThreshold = (freq: number) => {
+//     // Lower threshold for potential harmonics
+//     const freqFactor = Math.min(1, freq / 1000);
+//     return noiseFloor * (2 + freqFactor); // Linear threshold with frequency
+//   };
 
   return fftData
     .filter((point, i) => {

@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { FrequencyBand } from '../utils/frequency-analyzer';
 
 type BandAnalysis = {
   name: string;
@@ -24,7 +23,7 @@ const FrequencyBandAnalysis: React.FC<FrequencyBandAnalysisProps> = ({ analysis 
     <div className="p-4 bg-gray-100 rounded-lg">
       <h3 className="text-lg font-semibold mb-4">Frequency Band Analysis</h3>
       <div className="grid gap-4">
-        {nonZeroBands.map((band, index) => {
+        {nonZeroBands.map((band) => {
           const avgEnergy = band.energies.reduce((a, b) => a + b, 0) / band.energies.length;
           const trendColor = band.trend === 'increasing' ? 'text-green-600' : 
                            band.trend === 'decreasing' ? 'text-red-600' : 'text-gray-600';
