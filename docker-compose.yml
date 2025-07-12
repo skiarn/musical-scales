@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  tensorflow:
+    build: .
+    volumes:
+      - ./ai/data:/app/ai/data
+      - ./ai/models:/app/ai/models
+    environment:
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
