@@ -4,6 +4,7 @@ import numpy as np
 import os
 import json
 import librosa
+from config import *
 
 # Set random seed for reproducibility
 tf.random.set_seed(42)
@@ -11,8 +12,8 @@ np.random.seed(42)
 
 class HarmonicsAutoencoder:
     def __init__(self):
-        self.input_size = 1024
-        self.encoding_dim = 16
+        self.input_size = INPUT_SIZE
+        self.encoding_dim = ENCODING_DIM
         self.model = None
     
     def build_model(self):
@@ -77,8 +78,12 @@ class HarmonicsAutoencoder:
         return np.array(X), np.array(y_fund), np.array(y_harm)
 
 def main():
+    # Ensure directories exist
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    os.makedirs(DATA_DIR, exist_ok=True)
+
     # Training data path
-    audio_files = ['path/to/your/audio/files/*.wav']
+    audio_files = os.path.join(DATA_DIR, '*.wav')
     
     # Create and train model
     autoencoder = HarmonicsAutoencoder()
@@ -87,7 +92,7 @@ def main():
     # Prepare training data
     X, y_fund, y_harm = autoencoder.prepare_training_data(audio_files)
     
-    # Train the model
+    # Train the model with config parameters
     history = autoencoder.model.fit(
         X,
         {
@@ -95,13 +100,14 @@ def main():
             'harmonics': y_harm,
             'dense_4': X
         },
-        epochs=100,
-        batch_size=32,
-        validation_split=0.2
+        epochs=EPOCHS,
+        batch_size=BATCH_SIZE,
+        validation_split=VALIDATION_SPLIT
     )
     
-    # Save the model
-    tf.saved_model.save(autoencoder.model, 'models/harmonics_autoencoder')
+    # Save the model to configured directory
+    model_path = os.path.join(MODELS_DIR, 'harmonics_autoencoder')
+    tf.saved_model.save(autoencoder.model, model_path)
 
 if __name__ == "__main__":
     main()
