@@ -72,15 +72,21 @@ const FrequencyAnalyzer: React.FC<FrequencyAnalyzerProps> = ({
     }
   ];
 
+  const maxAmplitude = fftData.reduce((max, val) => Math.max(max, val.y), -Infinity);
+  const minAmplitude = fftData.reduce((min, val) => Math.min(min, val.y), Infinity);
+  const medianAmplitude = fftData
+    .map(p => p.y)
+    .sort((a, b) => a - b)[Math.floor(fftData.length / 2)];
+
   return (
     <div className="frequency-analyzer">
       <div className="analysis-info">
         <small>
-          Max Amplitude: {formatAmplitude(Math.max(...fftData.map(p => p.y)))}
+          Max Amplitude: {formatAmplitude(maxAmplitude)}
           <br />
-          Median Amplitude: {formatAmplitude([...fftData].map(p => p.y).sort((a, b) => a - b)[Math.floor(fftData.length / 2)])}
+          Median Amplitude: {formatAmplitude(medianAmplitude)}
           <br />
-          Min Amplitude: {formatAmplitude(Math.min(...fftData.map(p => p.y)))}
+          Min Amplitude: {formatAmplitude(minAmplitude)}
           <br />
           Noise Floor: {formatAmplitude(analysisResult.stats.noiseFloor)}
         </small>

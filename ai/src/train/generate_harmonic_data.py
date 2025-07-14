@@ -1,7 +1,8 @@
+import os
 import numpy as np
 import pandas as pd
 from ..utils.harmonic_analysis import extract_harmonics, calculate_harmonic_ratios
-from data.create_guitar_notes_csv import create_guitar_notes_data
+from ..data.create_guitar_notes_csv import create_guitar_notes_data
 
 def generate_synthetic_audio(frequency, duration=0.5, sample_rate=44100):
     """Generate synthetic audio signal with harmonics"""
@@ -47,4 +48,12 @@ def generate_harmonic_training_data(num_samples_per_note=10):
 
 if __name__ == "__main__":
     df = generate_harmonic_training_data()
-    df.to_csv('../data/harmonic_training_data.csv', index=False)
+
+    # Create output directory if it doesn't exist
+    output_dir = os.path.join(os.path.dirname(__file__), '../data')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Save to CSV
+    output_path = os.path.join(output_dir, 'harmonic_training_data.csv')
+
+    df.to_csv(output_path, index=False)

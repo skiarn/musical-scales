@@ -14,8 +14,8 @@ docker-compose up --build
 If you prefer a local setup without Docker:
 
 ```bash
-python3.9 -m venv aienv
-source aienv/bin/activate
+python -m venv aienv
+mac `source aienv/bin/activate` windows `.\aienv\Scripts\activate`
 pip install -r requirements.txt
 ```
 
@@ -25,6 +25,8 @@ pip install -r requirements.txt
 ```bash
 python src/train/generate_training_data.py
 ```
+
+python -m src.train.generate_harmonic_data
 
 2. Train the model:
 ```bash

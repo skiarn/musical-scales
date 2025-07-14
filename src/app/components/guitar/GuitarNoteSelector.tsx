@@ -95,8 +95,8 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
           const isHighlighted = isNoteHighlighted(note);
           const isActive = isNoteActive(note);
           const x = FRET_START + (note.fret * FRET_WIDTH) - (FRET_WIDTH / 2);
-          const y = STRING_SPACING * note.string;
-          
+          // Reverse string order for y so string 6 is at the top
+          const y = STRING_SPACING * (STRINGS - note.string + 1);
           return (
             <g
               key={`note-${note.string}-${note.fret}`}

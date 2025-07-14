@@ -175,8 +175,11 @@ export const analyzeFrequencies = (
     } = options;
 
     const amplitudes = fftData.map(p => p.y);
-    const maxAmplitude = Math.max(...amplitudes);
-    const minAmplitude = Math.min(...amplitudes);
+    //const maxAmplitude = Math.max(...amplitudes);
+    //const minAmplitude = Math.min(...amplitudes);
+    const maxAmplitude = amplitudes.reduce((max, val) => Math.max(max, val), -Infinity);
+    const minAmplitude = amplitudes.reduce((min, val) => Math.min(min, val), Infinity);
+
     const sortedAmplitudes = [...amplitudes].sort((a, b) => a - b);
     const medianAmplitude = sortedAmplitudes[Math.floor(sortedAmplitudes.length / 2)];
     const noiseFloor = calculateNoiseFloor(fftData);

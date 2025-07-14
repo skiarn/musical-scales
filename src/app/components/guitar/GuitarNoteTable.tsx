@@ -31,6 +31,7 @@ const GuitarNoteTable: React.FC<GuitarNoteTableProps> = ({
   return (
     <div className="guitar-note-table">
       <h3>Guitar Fretboard Frequencies</h3>
+      <p>{highlightFrequencies.join(", ")}</p>
       <div className="table-container" style={{ overflowX: 'auto' }}>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
           <thead>
@@ -42,9 +43,13 @@ const GuitarNoteTable: React.FC<GuitarNoteTableProps> = ({
             </tr>
           </thead>
           <tbody>
-            {structuredNotes.map((stringNotes, stringIndex) => (
-              <tr key={6 - stringIndex}>
-                <td><strong>String {6 - stringIndex}</strong></td>
+            {structuredNotes.map((_, stringIndex) => {
+              const idx = 5 - stringIndex; // Reverse order for guitar strings starting from thickest 6
+              const stringNotes = structuredNotes[idx];
+              return (
+              
+              <tr key={idx}>
+                <td><strong>String {idx + 1}</strong></td>
                 {stringNotes.map((note, fretIndex) => (
                   <td 
                     key={fretIndex}
@@ -66,7 +71,7 @@ const GuitarNoteTable: React.FC<GuitarNoteTableProps> = ({
                   </td>
                 ))}
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

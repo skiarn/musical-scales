@@ -30,8 +30,8 @@ export class HarmonicsAutoencoder {
     const input = tf.tensor2d([waveform], [1, this.inputSize]);
     
     // Get predictions
-    const [_, fundamental, harmonics] = this.model.predict(input) as tf.Tensor[];
-    
+    const [rank, fundamental, harmonics] = this.model.predict(input) as tf.Tensor[];
+    console.log("Model predictions:", rank, fundamental, harmonics);
     // Convert to JavaScript values
     const fundamentalFreq = (await fundamental.data())[0] * 1000; // Denormalize
     const harmonicAmplitudes = Array.from(await harmonics.data());

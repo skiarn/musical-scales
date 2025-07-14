@@ -16,6 +16,25 @@ interface DataViewProps {
   onZoomChange?: (reset: boolean, from: number, to: number, funcZoom: FuncZoom<{ x: number; y: number }>) => void;
 }
 
+async function loadAudioFileToData(url: string, setNewData: (data: { x: number; y: number }[], sampleRate: number) => void) {
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  const audioCtx = new (window.AudioContext || (window as Window).webkitAudioContext)();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+  // Use the first channel (mono)
+  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+
+  const audioData = Array.from(channelData).map((value, index) => ({
+    x: index / sampleRate,
+    y: value,
+  }));
+  console.log("Audio data loaded:", audioData.length, "Sample rate:", sampleRate);
+
+  setNewData(audioData, sampleRate);
+}
+
 const DataView: React.FC <DataViewProps> = ({ data, sampleRate, setNewData, onWindowFilterChange, onZoomChange }) => {
 const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
 
@@ -76,6 +95,19 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
 
   return (
     <div>
+      <GuitarSection fftData={dataFFT} minSnr={3} onNoteSelect={(note) => {
+        console.log("Selected note:", note);
+        const url = `musical-scales/data/guitar/S${note.string}-${note.fret}.m4a`;
+        loadAudioFileToData(url, setNewData);
+
+        if (note.fret <= 9) {
+          const audio = new Audio(url);
+          audio.play();
+          console.log("Playing note:", note);
+        }
+      }
+      } />
+      <AudioRecorder onStop={handleAudioStop} />
       <h1>Wave Plot</h1>
        <WaveView data={data}
        onZoom={(reset, from, to, funcZoom) => {
@@ -107,9 +139,6 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
         maxPeaks={10}
       />
 
-      <GuitarSection fftData={dataFFT} minSnr={3}></GuitarSection>
-
-      <AudioRecorder onStop={handleAudioStop} />
       {/*       
       <FrequencyBandAnalysis
         analysis={dataFFT.map((point, index) => ({
