@@ -97,7 +97,8 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
     <div>
       <GuitarSection fftData={dataFFT} minSnr={3} onNoteSelect={(note) => {
         console.log("Selected note:", note);
-        const url = `musical-scales/data/guitar/S${note.string}-${note.fret}.m4a`;
+        
+        const url = `${process.env.basePath}/data/guitar/S${note.string}-${note.fret}.m4a`;
         loadAudioFileToData(url, setNewData);
 
         if (note.fret <= 9) {
