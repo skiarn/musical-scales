@@ -1,6 +1,8 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
-import { applyHanningWindow } from '@/app/utils/signal-processing';
+import { applyHanningWindow, vibrationToVelocityRMS } from '@/app/utils/signal-processing';
+
+export type FuncTransform<T extends { x: number; y: number }> = (input: T[]) => T[];
 
 export type FuncZoom<T extends { x: number; y: number }> = (input: T[], from: number, to: number) => T[];
 export type FuncFilter<T extends { x: number; y: number }> = (input: T[]) => T[];
@@ -14,6 +16,7 @@ interface WaveViewProps {
       windows: string[]; // Changed to array of strings
     };
   };
+  onTransform: (transformation: string, enabled: boolean, funcTransform: FuncTransform<{ x: number, y: number }>) => void;
   onZoom:(reset: boolean, from: number, to: number, funcZoom: FuncZoom<{ x: number; y: number }>) => void;
   onFilter: (window: string, enabled: boolean, funcWindow: FuncFilter<{ x: number, y: number }>) => void;
 }
@@ -24,7 +27,7 @@ function zoomImpl(  input: { x: number, y: number }[],
   return input.filter(d => d.x >= from && d.x <= to);
 }
 
-const WaveView: React.FC<WaveViewProps> = ({ data, options, onFilter, onZoom }) => {
+const WaveView: React.FC<WaveViewProps> = ({ data, options, onFilter, onZoom, onTransform }) => {
   const ref = useRef<SVGSVGElement | null>(null);
   const [activeFilters, setActiveFilters] = useState<Set<string>>(new Set());
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -100,7 +103,7 @@ const WaveView: React.FC<WaveViewProps> = ({ data, options, onFilter, onZoom }) 
         const itemHeight = 30;
         const menuPadding = 5;
         const headerHeight = itemHeight + (menuPadding * 2);
-        const menuItems = [...options.filter.windows, 'Reset Zoom'];
+        const menuItems = [...options.filter.windows, 'Reset Zoom', 'velocity'];
         const menuMargin = 5;
 
         // Add drop shadow filter
@@ -174,7 +177,7 @@ const WaveView: React.FC<WaveViewProps> = ({ data, options, onFilter, onZoom }) 
               .on('click', () => {
                 if (item === 'Reset Zoom') {
                   onZoom(true, 0, 0, zoomImpl);
-                } else {
+                } else if (item === 'hanning') {
                   const newActiveFilters = new Set(activeFilters);
                   if (newActiveFilters.has(item)) {
                     newActiveFilters.delete(item);
@@ -184,6 +187,20 @@ const WaveView: React.FC<WaveViewProps> = ({ data, options, onFilter, onZoom }) 
                     onFilter(item, true, applyHanningWindow);
                   }
                   setActiveFilters(newActiveFilters);
+                } else if (item === 'velocity') {
+                  const newActiveFilters = new Set(activeFilters);
+                  if (newActiveFilters.has(item)) {
+                    newActiveFilters.delete(item);
+                    //onFilter(item, false, applyVelocity);
+                    //do velocity stuff ot update data...
+                    onTransform(item, false, () => data);
+                  } else {
+                    newActiveFilters.add(item);
+                    onTransform(item, true, vibrationToVelocityRMS);
+                  }
+                  setActiveFilters(newActiveFilters);
+                } else {
+                  console.warn(`Unknown filter action for item: ${item}`);
                 }
               });
 
@@ -230,7 +247,7 @@ const WaveView: React.FC<WaveViewProps> = ({ data, options, onFilter, onZoom }) 
         }
       }
     },
-    [onZoom, options, activeFilters, onFilter, isMenuOpen]
+    [onZoom, options, activeFilters, onFilter, isMenuOpen, onTransform]
   );
 
   useEffect(() => {

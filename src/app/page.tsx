@@ -4,7 +4,7 @@ import styles from "./page.module.css";
 import DataView from "./components/DataView";
 import { useCallback, useEffect, useState } from "react";
 import { SineWaveData } from "./examples/SineWaveData";
-import { FuncFilter, FuncZoom } from "./components/visualization/WaveView";
+import { FuncFilter, FuncTransform, FuncZoom } from "./components/visualization/WaveView";
 // import { BrowserInference } from "./components/analysis/ai/browser_inference";
 // import { HarmonicsData } from "./components/analysis/ai/harmonics_autoencoder";
 
@@ -18,6 +18,7 @@ export default function Home() {
 
   const [windowFunction, setWindowFunction] = useState<FuncFilter<{ x: number; y: number }> | null>(null);
   const [zoomFunction, setZoomFunction] = useState<FuncZoom<{ x: number; y: number }> | null>(null);
+  const [transformFunction, setTransformFunction] = useState<FuncTransform<{ x: number; y: number }> | null>(null);
   const [zoomFrom, setZoomFrom] = useState<number | null>(null);
   const [zoomTo, setZoomTo] = useState<number | null>(null);
 
@@ -62,6 +63,16 @@ export default function Home() {
     setZoomTo(to);
   }
 
+  const onTransformation = (transformation: string, enabled: boolean, funcTransform: FuncTransform<{ x: number; y: number }>) => {
+   if (!enabled) {
+      console.log("Removing transformation:", transformation);
+      setTransformFunction(null);
+      return;
+    }
+    console.log("Applying transformation:", transformation);
+    setTransformFunction(() => funcTransform);
+  };
+
   useEffect(() => {
     if (data.length > 0) {
       let newData = data;
@@ -75,10 +86,16 @@ export default function Home() {
         newData = windowFunction(newData);
       }
 
+      if (transformFunction) {
+        console.log("Data before transformation function", newData);
+        newData = transformFunction(newData);
+        console.log("Data after transformation function", newData);
+      }
+
       setDataPresented(newData);
     }
   }
-  , [data, zoomFunction, zoomFrom, zoomTo, windowFunction]);
+  , [data, zoomFunction, zoomFrom, zoomTo, windowFunction, transformFunction]);
 
   // useEffect(() => {
   //   const analyzeHarmonics = async () => {
@@ -104,8 +121,9 @@ export default function Home() {
     
         <DataView
           onZoomChange={onZoomChange}
-          data={ dataPresented}
+          data={dataPresented}
           sampleRate={sampleRate}
+          onTransform={onTransformation}
           setNewData={onNewData}
           onWindowFilterChange={onWindowFilterChange}
         ></DataView>

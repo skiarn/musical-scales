@@ -214,3 +214,118 @@ export const analyzeFrequencies = (
         }
     };
 };
+
+
+export type VibrationData = {
+  acceleration: number[];  // Acceleration time series data
+  sampleRate: number;      // In Hz
+};
+
+export type VelocityAnalysis = {
+  velocity: number[];      // Integrated velocity True peak
+  //peak?: number[];           // Optional: Peak velocity
+  rms?: number[];            // Optional: RMS velocity
+};
+
+
+function integrateTrapezoidal(data: number[], dt: number): number[] {
+  if (data.length === 0) return [0];
+  
+  const velocity: number[] = [0];
+  for (let i = 1; i < data.length; i++) {
+    const v = velocity[i - 1] + ((data[i - 1] + data[i]) / 2) * dt;
+    velocity.push(v);
+  }
+  return velocity;
+}
+
+
+
+export function calculateRMS(data: number[]): number {
+  if (data.length === 0) return NaN;
+  const squareSum = data.reduce((sum, val) => sum + val * val, 0);
+  return Math.sqrt(squareSum / data.length);
+}
+
+export function calculateRunningPeak(data: number[]): number[] {
+  const peakValues: number[] = [];
+  let maxVal = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    maxVal = Math.max(maxVal, Math.abs(data[i]));
+    peakValues.push(maxVal);
+  }
+
+  return peakValues;
+}
+
+function calculateRunningRMS(data: number[]): number[] {
+  const rmsValues: number[] = [];
+  let sumOfSquares = 0;
+
+  for (let i = 0; i < data.length; i++) {
+    sumOfSquares += data[i] * data[i];
+    const rms = Math.sqrt(sumOfSquares / (i + 1));
+    rmsValues.push(rms);
+  }
+
+  return rmsValues;
+}
+
+
+export function convertAccelerationToVelocity(
+  input: VibrationData,
+  options: { computeStats?: boolean } = {}
+): VelocityAnalysis {
+  const { acceleration, sampleRate } = input;
+  const dt = 1 / sampleRate;
+
+  const velocity = integrateTrapezoidal(acceleration, dt);
+
+  if (!options.computeStats) {
+    return { velocity };
+  }
+
+  return {
+    velocity,
+    rms: calculateRunningRMS(velocity),
+  };
+}
+
+export function vibrationToVelocityRMS( signal: { x: number; y: number }[]
+): { x: number; y: number }[] {
+  const velocity = vibrationToVelocityXY(signal);
+  return computeRMSXY(velocity);
+}
+
+export function vibrationToVelocityXY(
+  signal: { x: number; y: number }[]
+): { x: number; y: number }[] {
+  if (signal.length < 2) return [];
+
+  const velocity: { x: number; y: number }[] = [{ x: signal[0].x, y: 0 }]; // start at time x with 0 velocity
+
+  for (let i = 1; i < signal.length; i++) {
+    const dt = signal[i].x - signal[i - 1].x;
+    const avgAccel = 0.5 * (signal[i].y + signal[i - 1].y);
+    const area = avgAccel * dt;
+    const newVelocity = velocity[i - 1].y + area;
+    velocity.push({ x: signal[i].x, y: newVelocity });
+  }
+
+  return velocity;
+}
+
+export function computeRMSXY(signal: { x: number; y: number }[]): { x: number; y: number }[] {
+  if (signal.length === 0) return [];
+
+  const rmsValues: { x: number; y: number }[] = [];
+
+  for (let i = 0; i < signal.length; i++) {
+    const sumOfSquaresY = signal[i].y * signal[i].y;
+    const rmsY = Math.sqrt(sumOfSquaresY / (i + 1));
+    rmsValues.push({ x: signal[i].x, y: rmsY });
+  }
+
+  return rmsValues;
+}
