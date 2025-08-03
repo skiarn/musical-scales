@@ -1,16 +1,14 @@
-FROM tensorflow/tensorflow:latest-jupyter
+FROM tensorflow/tensorflow:2.15.0-jupyter
 
 WORKDIR /app
 
-# Copy requirements
+# Copy requirements first for caching
 COPY requirements.txt .
 
-# Update pip and install dependencies
-RUN python -m pip install --no-cache-dir --progress-bar off --no-deps \
-    --ignore-installed -r requirements.txt
+# Install all dependencies from requirements.txt only (manage versions there)
+RUN python3 -m pip install --no-cache-dir --progress-bar off -r requirements.txt
 
-# Ensure notebooks directory exists
-RUN mkdir -p /app/notebooks && \
-    chmod -R 777 /app
+# Ensure notebooks directory exists and set permissions
+RUN mkdir -p /app/notebooks && chmod -R 777 /app
 
 EXPOSE 8888

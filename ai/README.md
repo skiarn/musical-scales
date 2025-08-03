@@ -11,29 +11,32 @@ docker-compose up --build
 
 ## Alternative: Local Setup
 
-If you prefer a local setup without Docker:
+If you prefer a local setup without Docker use dev.dockerfile
+
+
 
 ```bash
 python -m venv aienv
-mac `source aienv/bin/activate` windows `.\aienv\Scripts\activate`
+mac `source aienv/bin/activate` windows `.\aienv\Scripts\activate` or  .\aienv\Scripts\Activate.ps1 .\aienv\Scripts\Activate.ps1 and Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
 pip install -r requirements.txt
 ```
 
 ## Running the Training
 
-1. Generate training data:
+1. Generate training data file harmonic_training_data.csv:
 ```bash
-python src/train/generate_training_data.py
+python src/data/guitar_generation.py
 ```
 
-python -m src.train.generate_harmonic_data
 
-2. Train the model:
+2. Train the model will generate harmonic_classifier_tf:
 ```bash
-python src/train/train_model.py
+python src/train/train_classifier.py
 ```
 
-3. Convert to TensorFlow.js:
+3. Create js model:
 ```bash
-python convert_to_tfjs.py
+tensorflowjs_converter --input_format=tf_saved_model harmonic_classifier_tf/ tfjs_model/
 ```
+
