@@ -15,7 +15,8 @@ export class HarmonicsAutoencoder {
 
   private async loadModel() {
     try {
-      this.model = await tf.loadLayersModel('/models/harmonics_autoencoder/model.json');
+      const url = `${process.env.basePath}/models/harmonics_autoencoder/model.json`;
+      this.model = await tf.loadLayersModel(url);
     } catch (error) {
       console.error('Error loading model:', error);
     }
@@ -30,15 +31,13 @@ export class HarmonicsAutoencoder {
     const input = tf.tensor2d([waveform], [1, this.inputSize]);
     
     // Get predictions
-    const [rank, fundamental, harmonics] = this.model.predict(input) as tf.Tensor[];
-    console.log("Model predictions:", rank, fundamental, harmonics);
-    // Convert to JavaScript values
-    const fundamentalFreq = (await fundamental.data())[0] * 1000; // Denormalize
-    const harmonicAmplitudes = Array.from(await harmonics.data());
-    
+    const output = this.model.predict(input) as tf.Tensor;
+    const outputData = Array.from(await output.data());
+    // outputData: [fundamental, harmonic1, harmonic2, harmonic3, harmonic4, harmonic5]
+    const fundamentalFreq = outputData[0] * 1000; // Denormalize if needed
+    const harmonicAmplitudes = outputData.slice(1);
     // Cleanup
-    tf.dispose([input, fundamental, harmonics]);
-    
+    tf.dispose([input, output]);
     return {
       fundamentalFreq,
       harmonicAmplitudes

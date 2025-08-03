@@ -5,8 +5,8 @@ import DataView from "./components/DataView";
 import { useCallback, useEffect, useState } from "react";
 import { SineWaveData } from "./examples/SineWaveData";
 import { FuncFilter, FuncTransform, FuncZoom } from "./components/visualization/WaveView";
-// import { BrowserInference } from "./components/analysis/ai/browser_inference";
-// import { HarmonicsData } from "./components/analysis/ai/harmonics_autoencoder";
+import { BrowserInference } from "./components/analysis/ai/browser_inference";
+import { HarmonicsData } from "./components/analysis/ai/harmonics_autoencoder";
 
 export default function Home() {
   const DEFAULT_SAMPLE_RATE = 800;
@@ -22,8 +22,8 @@ export default function Home() {
   const [zoomFrom, setZoomFrom] = useState<number | null>(null);
   const [zoomTo, setZoomTo] = useState<number | null>(null);
 
-  //const [harmonicsData, setHarmonicsData] = useState<HarmonicsData | null>(null);
-  //const browserInference = new BrowserInference();
+  const [harmonicsData, setHarmonicsData] = useState<HarmonicsData | null>(null);
+  const browserInference = new BrowserInference();
 
   const onNewData = (newData: { x: number; y: number }[], newSampleRate: number) => {
     setData(newData);
@@ -97,16 +97,16 @@ export default function Home() {
   }
   , [data, zoomFunction, zoomFrom, zoomTo, windowFunction, transformFunction]);
 
-  // useEffect(() => {
-  //   const analyzeHarmonics = async () => {
-  //     if (dataPresented.length > 0) {
-  //       const result = await browserInference.analyzeWaveform(dataPresented);
-  //       setHarmonicsData(result);
-  //     }
-  //   };
-  //   analyzeHarmonics();
-  // }, [dataPresented]);
-    
+   useEffect(() => {
+     const analyzeHarmonics = async () => {
+       if (dataPresented.length > 0) {
+         const result = await browserInference.analyzeWaveform(dataPresented);
+         setHarmonicsData(result);
+       }
+     };
+     analyzeHarmonics();
+  }, [dataPresented]);
+
   return (
     <div className={styles.page}>
        
