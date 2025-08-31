@@ -1,4 +1,6 @@
 .page {
+  background-color: var(--foreground); /* deep black */
+  color: #e0e0e0; /* soft light text */
   --gray-rgb: 0, 0, 0;
   --gray-alpha-200: rgba(var(--gray-rgb), 0.08);
   --gray-alpha-100: rgba(var(--gray-rgb), 0.05);

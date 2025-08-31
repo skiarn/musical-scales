@@ -23,7 +23,8 @@ export default function Home() {
   const [zoomTo, setZoomTo] = useState<number | null>(null);
 
   const [harmonicsData, setHarmonicsData] = useState<HarmonicsData | null>(null);
-  const browserInference = new BrowserInference();
+  console.log("Harmonics Data:", harmonicsData);
+  const [browserInference] = useState<BrowserInference>(new BrowserInference());
 
   const onNewData = (newData: { x: number; y: number }[], newSampleRate: number) => {
     setData(newData);
@@ -105,7 +106,7 @@ export default function Home() {
        }
      };
      analyzeHarmonics();
-  }, [dataPresented]);
+  }, [dataPresented, browserInference]);
 
   return (
     <div className={styles.page}>

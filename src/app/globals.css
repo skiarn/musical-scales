@@ -1,11 +1,17 @@
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0B0E14;
+  --text-primary: #E0E0E0;
+  --text-secondary: #B0B0B0;
+  --green-accent: #00C853;
+  --green-hover: #45a049;
+  --primary-button: #2B3242;
+  --button-primary-hover: #3C475E;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
+    --background: #0B0E14;
     --foreground: #ededed;
   }
 }
@@ -14,6 +20,10 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
+  --text-primary: #E0E0E0;
+  --text-secondary: #B0B0B0;
+  --green-accent: #00C853;
+  --green-hover: #00E676;
 }
 
 body {

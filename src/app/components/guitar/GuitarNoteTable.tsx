@@ -57,7 +57,7 @@ const GuitarNoteTable: React.FC<GuitarNoteTableProps> = ({
                       padding: '4px 8px',
                       textAlign: 'center',
                       backgroundColor: note && isFrequencyMatched(note.frequency) 
-                        ? '#90EE90' 
+                        ? 'var(--green-accent)' 
                         : 'transparent',
                       border: '1px solid #ddd'
                     }}

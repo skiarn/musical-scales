@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import AudioButton from './AudioButton';
 import AudioPlayButton from './AudioPlayButton';
 import AudioLoadChordButton from './AudioLoadChordButton';
@@ -55,21 +55,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
     audioChunksRef.current = [];
   }
 
-  useEffect(() => {
-    //when audio source is changes, trigger a audio contect and do stop
-    if (!audioUrl) return;
-    const fetchAndProcessAudio = async () => {
-      const response = await fetch(audioUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioContext = new AudioContext();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      const channelData = audioBuffer.getChannelData(0);
-      const sampleRate = audioBuffer.sampleRate;
-      onStop(channelData, sampleRate);
-    };
-    fetchAndProcessAudio();
-  }, [audioUrl]);
-  
   return (
     <div>
       <AudioButton

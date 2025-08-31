@@ -2,7 +2,6 @@
 
 import React from 'react';
 import './AudioLoadChordButton.css';
-import { generateGNoteBlob } from '../../utils/guitar-sample-generator';
 
 interface AudioLoadChordButtonProps {
     chord: string
@@ -22,6 +21,16 @@ const AudioLoadChordButton: React.FC<AudioLoadChordButtonProps> = ({chord, onSto
         setLoading(true);
         const urlPath =  `${process.env.basePath}/data/guitar/chords/${chord}.m4a`;
         setAudioUrl(urlPath);
+        const fetchAndProcessAudio = async () => {
+          const response = await fetch(urlPath);
+          const arrayBuffer = await response.arrayBuffer();
+          const audioContext = new AudioContext();
+          const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+          const channelData = audioBuffer.getChannelData(0);
+          const sampleRate = audioBuffer.sampleRate;
+          onStop(channelData, sampleRate);
+        };
+        fetchAndProcessAudio();
         setLoading(false);
       }}
     >
