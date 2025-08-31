@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import AudioButton from './AudioButton';
 import AudioPlayButton from './AudioPlayButton';
-import AudioLoadNoteButton from './AudioLoadNoteButton';
+import AudioLoadChordButton from './AudioLoadChordButton';
+import AudioSequencer from './AudioSequencer';
 
 interface AudioRecorderProps {
   onStop: (recordedData: Float32Array, sampleRate: number) => void;
@@ -30,6 +31,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
     mediaRecorderRef.current.onstop = async () => {
       const audioBlob = new Blob(audioChunksRef.current);
       const audioUrl = URL.createObjectURL(audioBlob); 
+      console.log("Recorded audio URL:", audioUrl);
       setAudioUrl(audioUrl);
       const arrayBuffer = await audioBlob.arrayBuffer();
       const audioBuffer = await audioContextRef.current!.decodeAudioData(arrayBuffer);
@@ -53,6 +55,20 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
     audioChunksRef.current = [];
   }
 
+  useEffect(() => {
+    //when audio source is changes, trigger a audio contect and do stop
+    if (!audioUrl) return;
+    const fetchAndProcessAudio = async () => {
+      const response = await fetch(audioUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      const channelData = audioBuffer.getChannelData(0);
+      const sampleRate = audioBuffer.sampleRate;
+      onStop(channelData, sampleRate);
+    };
+    fetchAndProcessAudio();
+  }, [audioUrl]);
   
   return (
     <div>
@@ -64,7 +80,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
       >
       </AudioButton>
       {audioUrl && <AudioPlayButton audioSrc={audioUrl}></AudioPlayButton> }
-      <AudioLoadNoteButton onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadNoteButton>
+      {/* <AudioLoadNoteButton onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadNoteButton> */}
+      <AudioLoadChordButton chord='G' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
+      <AudioLoadChordButton chord='Em' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
+      <AudioLoadChordButton chord='C' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
+      <AudioLoadChordButton chord='D' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
+      <AudioSequencer></AudioSequencer>
     </div>
   );
 };
