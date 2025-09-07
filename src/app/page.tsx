@@ -2,19 +2,29 @@
 
 import styles from "./page.module.css";
 import DataView from "./components/DataView";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { SineWaveData } from "./examples/SineWaveData";
 import { FuncFilter, FuncTransform, FuncZoom } from "./components/visualization/WaveView";
 import { BrowserInference } from "./components/analysis/ai/browser_inference";
-import { HarmonicsData } from "./components/analysis/ai/harmonics_autoencoder";
+// import { HarmonicsData } from "./components/analysis/ai/harmonics_autoencoder";
+import TabbedDataView from "./components/TabbedDataView";
+import type { AudioClip } from "./types/types";
 
 export default function Home() {
   const DEFAULT_SAMPLE_RATE = 800;
   //const DEFAULT_MIN_FREQ = 0;
   
-  const [data, setData] = useState<{ x: number; y: number }[]>([]);
+  const [data, setData] = useState<Float32Array<ArrayBufferLike>>(new Float32Array());
   const [dataPresented, setDataPresented] = useState<{ x: number; y: number }[]>([]);
   const [sampleRate, setSampleRate] = useState(DEFAULT_SAMPLE_RATE);
+
+  // Currently selected AudioClip coming from the sequencer (or created from dataPresented)
+  const [selectedClip, setSelectedClip] = useState<AudioClip | null>(null);
+
+  // When the sequencer (AudioSequencer) reports a selection, handle it here.
+  const handleSequenceSelected = (clip: AudioClip | null) => {
+    console.log('handleSequenceSelected', clip);
+  };
 
   const [windowFunction, setWindowFunction] = useState<FuncFilter<{ x: number; y: number }> | null>(null);
   const [zoomFunction, setZoomFunction] = useState<FuncZoom<{ x: number; y: number }> | null>(null);
@@ -22,24 +32,14 @@ export default function Home() {
   const [zoomFrom, setZoomFrom] = useState<number | null>(null);
   const [zoomTo, setZoomTo] = useState<number | null>(null);
 
-  const [harmonicsData, setHarmonicsData] = useState<HarmonicsData | null>(null);
-  console.log("Harmonics Data:", harmonicsData);
-  const [browserInference] = useState<BrowserInference>(new BrowserInference());
+  // const [harmonicsData, setHarmonicsData] = useState<HarmonicsData | null>(null);
+  // console.log("Harmonics Data:", harmonicsData);
+  // const [browserInference] = useState<BrowserInference>(new BrowserInference());
 
-  const onNewData = (newData: { x: number; y: number }[], newSampleRate: number) => {
+  const onNewData = (newData: Float32Array<ArrayBufferLike>, newSampleRate: number) => {
     setData(newData);
     setSampleRate(newSampleRate);
   };
-
-  const handleSinusExample = useCallback(
-    (
-      data: { x: number; y: number }[]
-    ) => {
-      setData(data);
-      setSampleRate(DEFAULT_SAMPLE_RATE);
-    },
-    [DEFAULT_SAMPLE_RATE]
-  );
 
   const onWindowFilterChange = (window: string, enabled: boolean, funcWindow: FuncFilter<{ x: number; y: number }>) => {
       if (enabled) {
@@ -76,7 +76,12 @@ export default function Home() {
 
   useEffect(() => {
     if (data.length > 0) {
-      let newData = data;
+      const audioData = Array.from(data).map((value, index) => ({
+        x: index / sampleRate,
+        y: value,
+      }));
+    
+      let newData = audioData;
       if (zoomFunction && zoomFrom !== null && zoomTo !== null) {
         console.log("Applying zoom from", zoomFrom, "to", zoomTo);
         newData = zoomFunction(newData, zoomFrom, zoomTo);
@@ -98,36 +103,62 @@ export default function Home() {
   }
   , [data, zoomFunction, zoomFrom, zoomTo, windowFunction, transformFunction]);
 
-   useEffect(() => {
-     const analyzeHarmonics = async () => {
-       if (dataPresented.length > 0) {
-         const result = await browserInference.analyzeWaveform(dataPresented);
-         setHarmonicsData(result);
-       }
-     };
-     analyzeHarmonics();
-  }, [dataPresented, browserInference]);
+  const audioClipFromData = useMemo<AudioClip | null>(() => {
+    if (!dataPresented || dataPresented.length === 0) return null;
+    const duration = Math.max(0.01, dataPresented.length / sampleRate);
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const floatData = Float32Array.from(dataPresented.map(d => d.y)); // just the amplitude values
+    const buffer = audioContext.createBuffer(
+      1,                     
+      floatData.length,   
+      sampleRate
+    );
+
+    buffer.copyToChannel(floatData, 0); // copy waveform
+    return {
+      id: `data-${Date.now()}`,
+      chord: 'custom',
+      start: 0,
+      duration,
+      color: '#8B5CF6',
+      buffer,
+      // no buffer / peaks here; consumers can decide how to fetch/compute
+    } as AudioClip;
+  }, [dataPresented, sampleRate]);
+
+  //  useEffect(() => {
+  //    const analyzeHarmonics = async () => {
+  //      if (dataPresented.length > 0) {
+  //        const result = await browserInference.analyzeWaveform(dataPresented);
+  //        setHarmonicsData(result);
+  //      }
+  //    };
+  //    analyzeHarmonics();
+  // }, [dataPresented, browserInference]);
 
   return (
-    <div className={styles.page}>
-       
-      <main className={styles.main}>
-      <SineWaveData
-        points={DEFAULT_SAMPLE_RATE}
-        amplitude={1}
-        frequency={10}
-        sampleRate={DEFAULT_SAMPLE_RATE}
-        onDataGenerated={handleSinusExample}
-      />
-    
-        <DataView
+    <div className={styles.main}>
+        <TabbedDataView
+          className="tab-container"
           onZoomChange={onZoomChange}
           data={dataPresented}
           sampleRate={sampleRate}
           onTransform={onTransformation}
           setNewData={onNewData}
           onWindowFilterChange={onWindowFilterChange}
-        ></DataView>
+          // New props: pass a lightweight AudioClip generated from dataPresented,
+          // and a callback to receive clip selections from the sequencer.
+          externalClip={audioClipFromData}
+          onSequenceSelected={handleSequenceSelected}
+        />
+         {/* <DataView
+           onZoomChange={onZoomChange}
+           data={dataPresented}
+           sampleRate={sampleRate}
+           onTransform={onTransformation}
+           setNewData={onNewData}
+           onWindowFilterChange={onWindowFilterChange}
+         ></DataView> */}
 
         {/* {harmonicsData && (
           <div className={styles.harmonics}>
@@ -145,7 +176,11 @@ export default function Home() {
           </div> }
         )}*/}
       
-      </main>
+       {/* Scrollable content below tabs */}
+  <div className="tab-content-wrapper">
+    {/* Place your content inside tabs normally */}
+  </div>
+  
       <footer className={styles.footer}>
         Sounds Good
       </footer>

@@ -11,13 +11,13 @@ import FrequencyAnalyzer from "./analysis/FrequencyAnalyzer";
 interface DataViewProps {
   data: { x: number; y: number }[];
   sampleRate: number;
-  setNewData: (data: { x: number; y: number }[], sampleRate: number) => void;
+  setNewData: (data: Float32Array<ArrayBufferLike>, sampleRate: number) => void;
   onTransform: (transformation: string, enabled: boolean, funcTransform: FuncTransform<{ x: number; y: number }>) => void;
   onWindowFilterChange: (window: string, enabled: boolean, funcWindow: FuncFilter<{ x: number; y: number }>) => void;
   onZoomChange?: (reset: boolean, from: number, to: number, funcZoom: FuncZoom<{ x: number; y: number }>) => void;
 }
 
-async function loadAudioFileToData(url: string, setNewData: (data: { x: number; y: number }[], sampleRate: number) => void) {
+async function loadAudioFileToData(url: string, setNewData: (data: Float32Array<ArrayBufferLike>, sampleRate: number) => void) {
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
   const audioCtx = new (window.AudioContext || (window as Window).webkitAudioContext)();
@@ -27,13 +27,7 @@ async function loadAudioFileToData(url: string, setNewData: (data: { x: number; 
   const channelData = audioBuffer.getChannelData(0);
   const sampleRate = audioBuffer.sampleRate;
 
-  const audioData = Array.from(channelData).map((value, index) => ({
-    x: index / sampleRate,
-    y: value,
-  }));
-  console.log("Audio data loaded:", audioData.length, "Sample rate:", sampleRate);
-
-  setNewData(audioData, sampleRate);
+  setNewData(channelData, sampleRate);
 }
 
 const DataView: React.FC <DataViewProps> = ({ data, sampleRate, setNewData, onWindowFilterChange, onZoomChange, onTransform }) => {
@@ -80,12 +74,8 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
       "Sample rate:",
       sampleRate
     );
-    const audioData = Array.from(channelData).map((value, index) => ({
-      x: index / sampleRate,
-      y: value,
-    }));
-    
-    setNewData(audioData, sampleRate); 
+
+    setNewData(channelData, sampleRate); 
   };
 
 

@@ -4,7 +4,6 @@ import React, { useRef, useState } from 'react';
 import AudioButton from './AudioButton';
 import AudioPlayButton from './AudioPlayButton';
 import AudioLoadChordButton from './AudioLoadChordButton';
-import AudioSequencer from './AudioSequencer';
 
 interface AudioRecorderProps {
   onStop: (recordedData: Float32Array, sampleRate: number) => void;
@@ -70,7 +69,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onStop }) => {
       <AudioLoadChordButton chord='Em' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
       <AudioLoadChordButton chord='C' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
       <AudioLoadChordButton chord='D' onStop={onStop} setAudioUrl={setAudioUrl}></AudioLoadChordButton>
-      <AudioSequencer></AudioSequencer>
     </div>
   );
 };

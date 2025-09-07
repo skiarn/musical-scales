@@ -16,10 +16,10 @@
 .audio-button:active {
   background-color: red; /* Color when pressed */
   transition: background-color 0s; /* Disable transition for immediate feedback */
-  color: black;
+  color: var(--text-primary);
 }
 
 .audio-button:hover {
   background-color: var(--button-primary-hover); /* Hover color for added effect */
-  color: black;
+  color: var(--text-primary);
 }

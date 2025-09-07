@@ -20,7 +20,7 @@
   
   .audio-load-chord-button:hover {
     background-color: var(--button-primary-hover); /* Hover color for added effect */
-    color: black;
+    color: var(--text-primary);
   }
   
   .audio-load-chord-button::after {

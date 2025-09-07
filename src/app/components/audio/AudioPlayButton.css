@@ -1,7 +1,7 @@
 .audio-play-button {
     background-color: var(--primary-button);
     border: none;
-    color: white;
+    color: var(--text-primary);
     padding: 15px 32px;
     text-align: center;
     text-decoration: none;
@@ -14,13 +14,13 @@
   
   .audio-play-button:hover {
     background-color: var(--button-primary-hover);
-    color: black;
+    color: var(--text-primary);
   }
   
   .audio-play-button.playing {
     background-color: #f44336; /* Red */
     border: none;
-    color: white;
+    color: var(--text-primary);
   }
   
   .sample-controls {

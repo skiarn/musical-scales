@@ -1,16 +1,7 @@
 // AudioSequencer.tsx
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
-
-type AudioClip = {
-  id: string;
-  chord: string;
-  start: number;        // seconds
-  duration: number;     // seconds
-  buffer?: AudioBuffer; // set after loading
-  color: string;
-  peaks?: Float32Array; // normalized [-1, 1], envelope per small time step
-};
+import { AudioClip } from '@/app/types/types';
 
 type PlayingSource = {
   source: AudioBufferSourceNode;
@@ -129,13 +120,23 @@ function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   return new Blob([view.buffer], { type: 'audio/wav' });
 }
 
-const AudioSequencer: React.FC = () => {
+type AudioSequencerProps = {
+  // Optional external clip passed in from parent; when provided and "Add" is pressed it will be appended.
+  externalClip?: AudioClip | null;
+  // Optional callback invoked when a clip is selected (or null when deselected).
+  onSequenceSelected?: (clip: AudioClip | null) => void;
+};
+
+const AudioSequencer: React.FC<AudioSequencerProps> = ({ externalClip = null, onSequenceSelected }) => {
   const [clips, setClips] = useState<AudioClip[]>([]);
-  const [selectedChord, setSelectedChord] = useState<string>(CHORDS[0]);
+  const [selectedChord, setSelectedChord] = useState<string | AudioClip>(CHORDS[0]);
   const [pxPerSec, setPxPerSec] = useState<number>(INITIAL_PX_PER_SEC);
   const [isPlaying, setIsPlaying] = useState(false);
   const [cursorTime, setCursorTime] = useState(0); // seconds
   const [snap, setSnap] = useState(SNAP_SECONDS);
+
+  // Selected clip id (null = none)
+  const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -234,6 +235,44 @@ const AudioSequencer: React.FC = () => {
   }
 
   const addClip = async () => {
+    // If the current selection is an AudioClip object, clone & append it
+    if (typeof selectedChord !== 'string') {
+      const clipObj: AudioClip = selectedChord;
+      const cloned: AudioClip = {
+        ...clipObj,
+        id: clipObj.id ?? uid(),
+        color: clipObj.color ?? chordColor(clipObj.chord ?? 'ext'),
+      };
+      if (!cloned.peaks && cloned.buffer) {
+        try {
+          cloned.peaks = computePeaks(cloned.buffer, 120);
+        } catch {
+          // ignore
+        }
+      }
+      setClips(prev => [...prev, cloned]);
+      return;
+    }
+
+    // Defensive: if somehow the string equals our external marker and externalClip exists
+    if (selectedChord === '__external__' && externalClip) {
+      const cloned: AudioClip = {
+        ...externalClip,
+        id: externalClip.id ?? uid(),
+        color: externalClip.color ?? chordColor(externalClip.chord ?? 'ext'),
+      };
+      if (!cloned.peaks && cloned.buffer) {
+        try {
+          cloned.peaks = computePeaks(cloned.buffer, 120);
+        } catch {
+          // ignore
+        }
+      }
+      setClips(prev => [...prev, cloned]);
+      return;
+    }
+
+    // Otherwise treat selectedChord as the chord name string and load it
     const clip = await loadClip(selectedChord);
     setClips(prev => [...prev, clip]);
   };
@@ -384,6 +423,12 @@ const AudioSequencer: React.FC = () => {
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
+    // Clear selection when re-rendering if the selected clip no longer exists
+    if (selectedClipId && !clips.find(c => c.id === selectedClipId)) {
+      setSelectedClipId(null);
+      onSequenceSelected?.(null);
+      //window.dispatchEvent(new CustomEvent('audio-sequencer:select', { detail: null }));
+    }
 
     // Ensure svg width grows with content; wrap container scrolls
     svg.attr('width', contentWidth).attr('height', SVG_HEIGHT);
@@ -445,10 +490,15 @@ const AudioSequencer: React.FC = () => {
     svg.on('mousedown', (event: MouseEvent) => {
       const pt = d3.pointer(event);
       const x = Math.max(0, Math.min(contentWidth, pt[0]));
-        // Seek by clicking on the ruler/track
+        // Seek by clicking on the ruler/track. Also deselect when clicking background.
       const handleSeek = (x: number) => {
         const t = x / pxPerSec;
         setCursorTime(t);
+        // Deselect any clip when clicking background
+        setSelectedClipId(null);
+        onSequenceSelected?.(null);
+        //window.dispatchEvent(new CustomEvent('audio-sequencer:select', { detail: null }));
+        onSequenceSelected?.(null);
         if (isPlaying) {
           playFrom(t);
         }
@@ -500,9 +550,13 @@ const AudioSequencer: React.FC = () => {
 
       g.attr('transform', `translate(${x}, ${y})`);
 
+      // Visual style: highlight if selected
+      const isSelected = clip.id === selectedClipId;
       g.select<SVGRectElement>('rect.bg')
         .attr('width', w)
-        .attr('fill', d3.color(clip.color)!.darker(0.3).formatHex());
+        .attr('fill', d3.color(clip.color)!.darker(0.3).formatHex())
+        .attr('stroke', isSelected ? '#FFD166' : '#11151F')
+        .attr('stroke-width', isSelected ? 2.5 : 1.5);
 
       // Waveform area
       const peaks = clip.peaks ?? new Float32Array(0);
@@ -558,6 +612,15 @@ const AudioSequencer: React.FC = () => {
             setClips(prev => prev.map(c => (c.id === d.id ? { ...c, start: snappedT } : c)));
           })
       );
+
+      // Selection: click a clip to select it and notify consumers.
+      g.on('click', (event: MouseEvent, d: AudioClip) => {
+        // Prevent background handler from firing (which would deselect)
+        event.stopPropagation();
+        setSelectedClipId(d.id);
+        onSequenceSelected?.(d);
+        //window.dispatchEvent(new CustomEvent('audio-sequencer:select', { detail: d }));
+      });
     });
 
     // Playhead
@@ -571,13 +634,15 @@ const AudioSequencer: React.FC = () => {
       .attr('stroke-width', 2)
       .attr('pointer-events', 'none');
 
-  }, [clips, pxPerSec, contentWidth, projectDuration, cursorTime, snap]);
+  }, [clips, pxPerSec, contentWidth, projectDuration, cursorTime, snap, selectedClipId, isPlaying, onSequenceSelected]);
 
   // Resize: make container horizontally scrollable to contentWidth
   useEffect(() => {
     if (!containerRef.current) return;
     containerRef.current.scrollLeft = Math.max(0, (cursorTime * pxPerSec) - 100);
   }, [cursorTime, pxPerSec]);
+
+  const selectedChordValue = typeof selectedChord === 'string' ? selectedChord : '__external__';
 
   return (
     <div style={{ fontFamily: 'Inter, ui-sans-serif, system-ui, -apple-system', color: '#E6EDF7' }}>
@@ -647,11 +712,19 @@ const AudioSequencer: React.FC = () => {
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#A6B1C2' }}>Add clip</span>
             <select
-              value={selectedChord}
-              onChange={(e) => setSelectedChord(e.target.value)}
+              value={selectedChordValue}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === '__external__') {
+                  if (externalClip) setSelectedChord(externalClip);
+                } else {
+                  setSelectedChord(v);
+                }
+              }}
               style={{ background: '#0F131C', color: '#E6EDF7', border: '1px solid #1E2430', borderRadius: 6, padding: '6px 8px' }}
             >
               {CHORDS.map(c => <option key={c} value={c}>{c}</option>)}
+              {externalClip && <option key="__external__" value="__external__">External: {externalClip.chord ?? 'Clip'}</option>}
             </select>
             <button
               onClick={addClip}
