@@ -1,11 +1,8 @@
 "use client";
 
 import styles from "./page.module.css";
-import DataView from "./components/DataView";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { SineWaveData } from "./examples/SineWaveData";
+import { useEffect, useMemo, useState } from "react";
 import { FuncFilter, FuncTransform, FuncZoom } from "./components/visualization/WaveView";
-import { BrowserInference } from "./components/analysis/ai/browser_inference";
 // import { HarmonicsData } from "./components/analysis/ai/harmonics_autoencoder";
 import TabbedDataView from "./components/TabbedDataView";
 import type { AudioClip } from "./types/types";
@@ -17,9 +14,6 @@ export default function Home() {
   const [data, setData] = useState<Float32Array<ArrayBufferLike>>(new Float32Array());
   const [dataPresented, setDataPresented] = useState<{ x: number; y: number }[]>([]);
   const [sampleRate, setSampleRate] = useState(DEFAULT_SAMPLE_RATE);
-
-  // Currently selected AudioClip coming from the sequencer (or created from dataPresented)
-  const [selectedClip, setSelectedClip] = useState<AudioClip | null>(null);
 
   // When the sequencer (AudioSequencer) reports a selection, handle it here.
   const handleSequenceSelected = (clip: AudioClip | null) => {
@@ -101,12 +95,12 @@ export default function Home() {
       setDataPresented(newData);
     }
   }
-  , [data, zoomFunction, zoomFrom, zoomTo, windowFunction, transformFunction]);
+  , [data, sampleRate, zoomFunction, zoomFrom, zoomTo, windowFunction, transformFunction]);
 
   const audioClipFromData = useMemo<AudioClip | null>(() => {
     if (!dataPresented || dataPresented.length === 0) return null;
     const duration = Math.max(0.01, dataPresented.length / sampleRate);
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioContext = new (window.AudioContext || (window as Window).webkitAudioContext)();
     const floatData = Float32Array.from(dataPresented.map(d => d.y)); // just the amplitude values
     const buffer = audioContext.createBuffer(
       1,                     

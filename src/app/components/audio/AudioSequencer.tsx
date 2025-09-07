@@ -1,5 +1,5 @@
 // AudioSequencer.tsx
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { AudioClip } from '@/app/types/types';
 
@@ -277,8 +277,34 @@ const AudioSequencer: React.FC<AudioSequencerProps> = ({ externalClip = null, on
     setClips(prev => [...prev, clip]);
   };
 
-  // Playback scheduling from a given start time (cursor)
-  const playFrom = (startAtTime: number) => {
+  const stopPlayback = useCallback(() => {
+    for (const p of playingRef.current) {
+      try { p.source.stop(); } catch { /* noop */ }
+    }
+    playingRef.current = [];
+    setIsPlaying(false);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const animatePlayhead = useCallback(() => {
+    const audioCtx = audioCtxRef.current;
+    if (!audioCtx) return;
+    const tick = () => {
+      const elapsed = audioCtx.currentTime - startedAtRef.current;
+      const pos = cursorAtStartRef.current + elapsed;
+      setCursorTime(Math.min(pos, projectDuration));
+      // stop automatically when past project end
+      if (pos >= projectDuration) {
+        stopPlayback();
+        setCursorTime(projectDuration);
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }, [projectDuration, stopPlayback]);
+
+  const playFrom = useCallback((startAtTime: number) => {
     if (!audioCtxRef.current) audioCtxRef.current = new AudioContext();
     const audioCtx = audioCtxRef.current;
     if (!audioCtx) return;
@@ -325,9 +351,9 @@ const AudioSequencer: React.FC<AudioSequencerProps> = ({ externalClip = null, on
     playingRef.current = active;
     setIsPlaying(true);
     animatePlayhead();
-  };
+  }, [clips, stopPlayback, animatePlayhead]);
 
-  const pausePlayback = () => {
+  const pausePlayback = useCallback(() => {
     // Compute new cursor based on elapsed
     const audioCtx = audioCtxRef.current;
     if (!audioCtx) return;
@@ -341,16 +367,7 @@ const AudioSequencer: React.FC<AudioSequencerProps> = ({ externalClip = null, on
     playingRef.current = [];
     setIsPlaying(false);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  };
-
-  const stopPlayback = () => {
-    for (const p of playingRef.current) {
-      try { p.source.stop(); } catch { /* noop */ }
-    }
-    playingRef.current = [];
-    setIsPlaying(false);
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-  };
+  }, [projectDuration]);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -363,24 +380,6 @@ const AudioSequencer: React.FC<AudioSequencerProps> = ({ externalClip = null, on
   const handleStop = () => {
     stopPlayback();
     setCursorTime(0);
-  };
-
-  const animatePlayhead = () => {
-    const audioCtx = audioCtxRef.current;
-    if (!audioCtx) return;
-    const tick = () => {
-      const elapsed = audioCtx.currentTime - startedAtRef.current;
-      const pos = cursorAtStartRef.current + elapsed;
-      setCursorTime(Math.min(pos, projectDuration));
-      // stop automatically when past project end
-      if (pos >= projectDuration) {
-        stopPlayback();
-        setCursorTime(projectDuration);
-        return;
-      }
-      rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
   };
 
   // Offline render and download as WAV
@@ -634,7 +633,7 @@ const AudioSequencer: React.FC<AudioSequencerProps> = ({ externalClip = null, on
       .attr('stroke-width', 2)
       .attr('pointer-events', 'none');
 
-  }, [clips, pxPerSec, contentWidth, projectDuration, cursorTime, snap, selectedClipId, isPlaying, onSequenceSelected]);
+  }, [clips, pxPerSec, contentWidth, projectDuration, cursorTime, snap, selectedClipId, isPlaying, playFrom, onSequenceSelected]);
 
   // Resize: make container horizontally scrollable to contentWidth
   useEffect(() => {

@@ -10,7 +10,6 @@ import FrequencyAnalyzer from "./analysis/FrequencyAnalyzer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./layout/tabs";
 import AudioSequencer from "./audio/AudioSequencer";
 import type { AudioClip } from "../types/types";
-import { on } from "events";
 
 interface TabbedDataViewProps {
     data: { x: number; y: number }[];
