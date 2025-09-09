@@ -10,6 +10,8 @@ import FrequencyAnalyzer from "./analysis/FrequencyAnalyzer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./layout/tabs";
 import AudioSequencer from "./audio/AudioSequencer";
 import type { AudioClip } from "../types/types";
+import ChordTrainer from "./guitar/ChordTrainer";
+import GuitarMenu from "./guitar/GuitarMenu";
 
 interface TabbedDataViewProps {
     data: { x: number; y: number }[];
@@ -61,7 +63,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     onWindowFilterChange,
     onZoomChange,
     onTransform,
-    className, 
+    className,
     externalClip,
     onSequenceSelected
 }) => {
@@ -112,32 +114,39 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     return (
         <Tabs defaultValue="guitar" className={className}>
             <TabsList className="mb-4">
-            <TabsTrigger value="guitar">🎸 Guitar</TabsTrigger>
-            <TabsTrigger value="wave">📈 Waveform</TabsTrigger>
-            <TabsTrigger value="fft">🔊 FFT</TabsTrigger>
-            <TabsTrigger value="analysis">🔍 Analysis</TabsTrigger>
-        </TabsList>
+                <TabsTrigger value="guitar">🎸 Guitar</TabsTrigger>
+                <TabsTrigger value="wave">📈 Waveform</TabsTrigger>
+                <TabsTrigger value="fft">🔊 FFT</TabsTrigger>
+                <TabsTrigger value="analysis">🔍 Analysis</TabsTrigger>
+            </TabsList>
 
 
             <TabsContent value="guitar">
-                <GuitarSection
-                    fftData={dataFFT}
-                    minSnr={3}
-                    onNoteSelect={(note) => {
-                        const url = `${process.env.basePath}/data/guitar/S${note.string}-${note.fret}.m4a`;
-                        loadAudioFileToData(url, setNewData);
+                <GuitarMenu
+                    analytical={<><GuitarSection
+                        fftData={dataFFT}
+                        minSnr={3}
+                        onNoteSelect={(note) => {
+                            const url = `${process.env.basePath}/data/guitar/S${note.string}-${note.fret}.m4a`;
+                            loadAudioFileToData(url, setNewData);
 
-                        if (note.fret <= 9) {
-                            const audio = new Audio(url);
-                            audio.play();
-                        }
-                    }}
+                            if (note.fret <= 9) {
+                                const audio = new Audio(url);
+                                audio.play();
+                            }
+                        }}
+                    />
+                        <AudioRecorder onStop={handleAudioStop} />
+                        <AudioSequencer
+                            externalClip={externalClip}
+                            onSequenceSelected={onSequenceSelected}
+                        />
+                    </>}
+                    practice={<ChordTrainer />}
                 />
-                <AudioRecorder onStop={handleAudioStop} />
-                <AudioSequencer
-                    externalClip={ externalClip}
-                    onSequenceSelected={ onSequenceSelected }
-                />
+
+
+
 
             </TabsContent>
 
