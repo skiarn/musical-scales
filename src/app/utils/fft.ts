@@ -66,14 +66,18 @@ export const transformFFTData = (dataFFT: { frequency: number; amplitude: number
 };
 
 export const filterFFTData = (fftData: { frequency: number; amplitude: number }[], sampleRate: number, minFreq: number, maxFreq: number) => {
-  // Direct filtering on the fftData using frequency property
-  const filteredData = fftData.filter(point => 
-    point.frequency >= minFreq && point.frequency <= maxFreq
-  );
+  // Create an output array that preserves the original bin indices/length
+  // but sets amplitudes to 0 for frequencies outside the requested band.
+  const amplitudes = fftData.map(point => {
+    if (point.frequency >= minFreq && point.frequency <= maxFreq) {
+      return { frequency: point.frequency, amplitude: point.amplitude };
+    }
+    return { frequency: point.frequency, amplitude: 0 };
+  });
 
   return {
-    frequencies: filteredData.map(point => point.frequency),
-    amplitudes: filteredData
+    frequencies: amplitudes.map(point => point.frequency),
+    amplitudes // array of { frequency, amplitude } with out-of-band amplitudes zeroed
   };
 };
 

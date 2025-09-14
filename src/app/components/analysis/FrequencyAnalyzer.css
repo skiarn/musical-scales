@@ -1,0 +1,49 @@
+.frequency-analyzer {
+  color: #ffffff;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+.frequency-analyzer .analysis-info small {
+  color: #cbd5e1; /* light slate */
+  display: block;
+  margin-bottom: 12px;
+}
+
+.frequency-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.frequency-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.frequency-table th,
+.frequency-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: #fff;
+  font-size: 13px;
+}
+
+.frequency-table thead th {
+  background: rgba(255,255,255,0.02);
+  color: #e6eef8;
+  font-weight: 600;
+}
+
+.frequency-table tbody tr:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+.frequency-table .empty {
+  color: #9aa4b2;
+  padding: 16px;
+  text-align: center;
+}

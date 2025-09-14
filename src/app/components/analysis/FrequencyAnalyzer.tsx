@@ -1,4 +1,5 @@
 import React from 'react';
+import './FrequencyAnalyzer.css';
 import { TimeSeriesPoint, FrequencyPeak, analyzeFrequencies } from '../../utils/signal-processing';
 import DataTable, { DataRecord, Column } from '../DataTable';
 

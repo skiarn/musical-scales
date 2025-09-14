@@ -67,14 +67,21 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     externalClip,
     onSequenceSelected
 }) => {
-    const DEFAULT_MAX_FREQ = sampleRate / 2;
+
+    const defaultMaxFreq = useMemo(() => {
+        if (!data || data.length === 0) return sampleRate / 2;
+        const N = Math.max(1, data.length);
+        const paddedLength = 2 ** Math.ceil(Math.log2(N));
+        const lastBinIdx = paddedLength / 2 - 1;
+        return lastBinIdx * sampleRate / paddedLength;
+    }, [data, sampleRate]);
 
     const [dataFFT, setDataFFT] = useState<{ x: number; y: number }[]>([]);
-    const [maxFreq, setMaxFreq] = useState(DEFAULT_MAX_FREQ);
+    const [maxFreq, setMaxFreq] = useState<number>(defaultMaxFreq);
     const [minFreq, setMinFreq] = useState(0);
 
     const worker = useMemo(() => {
-        if (typeof Window !== "undefined") {
+        if (typeof window !== "undefined") {
             return new Worker(new URL("../workers/fft.worker.ts", import.meta.url));
         }
     }, []);
@@ -84,6 +91,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
 
         worker.onmessage = (e) => {
             setDataFFT(transformFFTData(e.data.filteredFFT.amplitudes));
+            console.log('FFT worker response:', e.data);
         };
 
         return () => worker.terminate();
@@ -96,6 +104,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
 
             setMaxFreq(fftData[fftData.length - 1].frequency);
             setDataFFT(transformFFTData(fftData));
+            console.log(`Computed FFT with ${fftData.length} frequency bins.`);
         }
     }, [data, sampleRate]);
 
@@ -169,13 +178,12 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
             <TabsContent value="fft">
                 <h1>FFT Plot</h1>
                 <FrequencyFilter
-                    defaultMaxFreq={DEFAULT_MAX_FREQ}
+                    defaultMaxFreq={defaultMaxFreq}
                     data={data}
                     sampleRate={sampleRate}
                     onFilterChange={filterChange}
                 />
-                <span>Min:{minFreq} Max:{maxFreq}</span>
-                <FFTView data={dataFFT.slice(minFreq, maxFreq)} />
+                <FFTView data={dataFFT.filter(point => point.x >= minFreq && point.x <= maxFreq)} />
             </TabsContent>
 
             <TabsContent value="analysis">

@@ -31,10 +31,17 @@ async function loadAudioFileToData(url: string, setNewData: (data: Float32Array<
 }
 
 const DataView: React.FC <DataViewProps> = ({ data, sampleRate, setNewData, onWindowFilterChange, onZoomChange, onTransform }) => {
-const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
+
+const defaultMaxFreq = useMemo(() => {
+        if (!data || data.length === 0) return sampleRate / 2;
+        const N = Math.max(1, data.length);
+        const paddedLength = 2 ** Math.ceil(Math.log2(N));
+        const lastBinIdx = paddedLength / 2 - 1;
+        return lastBinIdx * sampleRate / paddedLength;
+    }, [data, sampleRate]);
 
   const [dataFFT, setDataFFT] = useState<{ x: number; y: number }[]>([]);
-  const [maxFreq, setMaxFreq] = useState(DEFAULT_MAX_FREQ);
+  const [maxFreq, setMaxFreq] = useState(defaultMaxFreq);
   const [minFreq, setMinFreq] = useState(0);
 
   const worker = useMemo(() => {
@@ -123,7 +130,7 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
         onWindowFilterChange(window, enabled, funcWindow);
        }} options={{filter: {windows: ["hanning"]}}}/>
       <FrequencyFilter
-        defaultMaxFreq={DEFAULT_MAX_FREQ}
+        defaultMaxFreq={defaultMaxFreq}
         data={data}
         sampleRate={sampleRate}
         onFilterChange={filterChange}
@@ -131,7 +138,9 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
 
       <h1>FFT Plot</h1>
       <span>Min:{minFreq} Max:{maxFreq}</span>
-      <FFTView data={dataFFT.slice(minFreq, maxFreq)} />
+      <FFTView data={
+        dataFFT.filter(point => point.x >= minFreq && point.x <= maxFreq)
+      } />
 
       <FrequencyAnalyzer
         fftData={dataFFT}
