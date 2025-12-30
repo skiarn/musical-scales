@@ -16,7 +16,7 @@ const AudioLoadChordButton: React.FC<AudioLoadChordButtonProps> = ({chord, onSto
     <button
       className={`audio-load-chord-button ${loading ? 'loading' : ''}`}
       disabled={loading}
-      onClick={async () => {
+      onClick={() => {
         setAudioUrl(null);
         setLoading(true);
         const urlPath =  `${process.env.basePath}/data/guitar/chords/${chord}.m4a`;

@@ -23,7 +23,7 @@
     color: var(--text-primary);
   }
   
-  .audio-load-chord-button::after {
+  .audio-load-chord-button.loading::after {
     content: '';
     position: absolute;
     width: 16px;
