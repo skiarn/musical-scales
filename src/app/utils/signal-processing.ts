@@ -329,3 +329,27 @@ export function computeRMSXY(signal: { x: number; y: number }[]): { x: number; y
 
   return rmsValues;
 }
+
+export function pickPeaks(
+  spectrum: Float32Array,
+  sampleRate: number,
+  threshold: number,
+  maxPeaks = 5
+) {
+  const peaks: { freq: number; amp: number }[] = [];
+
+  for (let i = 1; i < spectrum.length - 1; i++) {
+    if (
+      spectrum[i] > threshold &&
+      spectrum[i] > spectrum[i - 1] &&
+      spectrum[i] > spectrum[i + 1]
+    ) {
+      const freq = (i * sampleRate) / (2 * spectrum.length);
+      peaks.push({ freq, amp: spectrum[i] });
+    }
+  }
+
+  return peaks
+    .sort((a, b) => b.amp - a.amp)
+    .slice(0, maxPeaks);
+}
