@@ -1,6 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+"use client";
+
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
-import "./ChordTrainer.css"; 
+import "./ChordTrainer.css";
+import DatasetCapture from "./DatasetCapture";
+import { blobToWav } from "@/app/utils/wav";
+
 
 // Types
 interface ChordPosition {
@@ -191,6 +196,10 @@ export default function ChordTrainer() {
     Array<{ chord: string; name: string; size: number }>
   >([]);
 
+  // Dataset capture toggle (moved to a dedicated component)
+  const [datasetMode, setDatasetMode] = useState<boolean>(false);
+
+
   // Support a ticking pulse so single-item loops re-trigger animations, and a "solo" index
   const [tick, setTick] = useState<number>(0);
   const [soloIndex, setSoloIndex] = useState<number | null>(null);
@@ -198,30 +207,12 @@ export default function ChordTrainer() {
   const prevTickRef = useRef<number>(0);
 
   // Pick a mimeType for MediaRecorder that's supported by the browser
-  const chooseMimeType = () => {
-    const candidates = [
-      "audio/webm;codecs=opus",
-      "audio/webm",
-      "audio/ogg;codecs=opus",
-      "audio/ogg",
-    ];
-    try {
-      if (typeof (MediaRecorder as any).isTypeSupported === "function") {
-        for (const c of candidates) {
-          if ((MediaRecorder as any).isTypeSupported(c)) return c;
-        }
-      }
-    } catch (err) {
-      // ignore
-    }
-    return undefined;
-  };
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaStreamRef.current = stream;
-      const mimeType = chooseMimeType();
+      const mimeType = mediaRecorderRef.current?.mimeType;
       if (mimeType) console.log("MediaRecorder mimeType:", mimeType);
       const mr = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       mediaRecorderRef.current = mr;
@@ -254,7 +245,7 @@ export default function ChordTrainer() {
   };
 
   // Stop current recorder and optionally restart a new recorder for the next segment
-  const flushAndMaybeRestart = (nextSegmentName?: string) => {
+  const flushAndMaybeRestart = useCallback((nextSegmentName?: string) => {
     const mr = mediaRecorderRef.current;
     if (!mr) return;
     // Mark the segment we want flushed
@@ -268,7 +259,7 @@ export default function ChordTrainer() {
       // create a fresh recorder to get a full container header in the next segment
       try {
         if (!mediaStreamRef.current) return;
-        const mimeType = chooseMimeType();
+        const mimeType = mediaRecorderRef.current?.mimeType;
         const newMr = mimeType ? new MediaRecorder(mediaStreamRef.current, { mimeType }) : new MediaRecorder(mediaStreamRef.current);
         mediaRecorderRef.current = newMr;
         newMr.ondataavailable = (e: BlobEvent) => {
@@ -306,7 +297,7 @@ export default function ChordTrainer() {
       console.warn("Error stopping recorder during flush:", err);
       mr.removeEventListener("stop", handleStop);
     }
-  };
+  }, [recording]);
 
   const stopRecording = () => {
     if (!mediaRecorderRef.current) return;
@@ -327,62 +318,17 @@ export default function ChordTrainer() {
     mediaRecorderRef.current = null;
   };
 
-  // Convert an encoded audio Blob (webm/ogg) into a WAV Blob (PCM16) and return it
-  const blobToWav = async (blob: Blob): Promise<Blob> => {
-    const arrayBuffer = await blob.arrayBuffer();
-    const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as any;
-    const audioCtx = new AudioCtx();
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-    const numChannels = audioBuffer.numberOfChannels;
-    const sampleRate = audioBuffer.sampleRate;
-    const length = audioBuffer.length;
-
-    // Interleave channels
-    const interleaved = new Float32Array(length * numChannels);
-    for (let ch = 0; ch < numChannels; ch++) {
-      const channelData = audioBuffer.getChannelData(ch);
-      for (let i = 0; i < length; i++) {
-        interleaved[i * numChannels + ch] = channelData[i];
-      }
-    }
-
-    // WAV file: 44-byte header + 16-bit PCM samples
-    const wavBuffer = new ArrayBuffer(44 + interleaved.length * 2);
-    const view = new DataView(wavBuffer);
-    const writeString = (offset: number, s: string) => {
-      for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
-    };
-
-    writeString(0, "RIFF");
-    view.setUint32(4, 36 + interleaved.length * 2, true);
-    writeString(8, "WAVE");
-    writeString(12, "fmt ");
-    view.setUint32(16, 16, true); // PCM chunk size
-    view.setUint16(20, 1, true); // format = 1 (PCM)
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * numChannels * 2, true); // byte rate
-    view.setUint16(32, numChannels * 2, true); // block align
-    view.setUint16(34, 16, true); // bits per sample
-    writeString(36, "data");
-    view.setUint32(40, interleaved.length * 2, true);
-
-    // write PCM samples (16-bit little endian)
-    let offset = 44;
-    for (let i = 0; i < interleaved.length; i++, offset += 2) {
-      let s = Math.max(-1, Math.min(1, interleaved[i]));
-      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
-    }
-
-    if (audioCtx.close) await audioCtx.close();
-    return new Blob([view], { type: "audio/wav" });
-  };
-
   const downloadWavFile = async (idx: number) => {
     const r = recordingsRef.current[idx];
     if (!r) return;
     try {
       const wavBlob = await blobToWav(r.blob);
+      // Quick sanity check: a valid WAV should be larger than the 44-byte header
+      if (wavBlob.size < 44) {
+        console.warn("WAV blob too small", wavBlob.size);
+        alert("Failed to create a valid WAV file; please re-record or try a different browser.");
+        return;
+      }
       const url = URL.createObjectURL(wavBlob);
       const a = document.createElement("a");
       a.href = url;
@@ -390,7 +336,15 @@ export default function ChordTrainer() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-      URL.revokeObjectURL(url);
+      // Revoke the object URL after a short delay to ensure the download has started in all browsers
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          console.error("Failed to revoke object URL:", e);
+          // ignore
+        }
+      }, 1500);
     } catch (err) {
       console.error("Failed to convert to WAV", err);
       alert("Failed to convert recording to WAV.");
@@ -420,10 +374,9 @@ export default function ChordTrainer() {
       // Revoke the object URL and try decode/play via AudioContext
       try {
         URL.revokeObjectURL(url);
-      } catch {}
+      } catch { }
       try {
-        const AudioCtx = (window.AudioContext || (window as any).webkitAudioContext) as any;
-        const ac = new AudioCtx();
+        const ac = new (window.AudioContext || (window as Window).webkitAudioContext)();
         const buffer = await ac.decodeAudioData(await r.blob.arrayBuffer());
         const src = ac.createBufferSource();
         src.buffer = buffer;
@@ -432,7 +385,7 @@ export default function ChordTrainer() {
         src.onended = () => {
           try {
             ac.close();
-          } catch {}
+          } catch { }
         };
       } catch (err2) {
         console.error("Fallback AudioContext playback failed:", err2);
@@ -450,14 +403,8 @@ export default function ChordTrainer() {
     }
   };
 
-  const downloadAllWavs = () => {
-    recordingsRef.current.forEach((_, i) => {
-      setTimeout(() => downloadWavFile(i), i * 300);
-    });
-  };
-
   // Active sequence respects soloIndex if set
-  const activeSequence = soloIndex !== null ? [sequence[soloIndex]] : sequence;
+  const activeSequence = useMemo(() => soloIndex !== null ? [sequence[soloIndex]] : sequence, [soloIndex, sequence]);
 
   useEffect(() => {
     if (!playing || activeSequence.length === 0) return;
@@ -478,8 +425,9 @@ export default function ChordTrainer() {
     setCurrent(0);
     setTick((t) => t + 1);
     prevActiveIndexRef.current = 0;
-    prevTickRef.current = tick;
   }, [soloIndex]);
+
+  useEffect(() => { prevTickRef.current = tick; }, [tick]);
 
   const addChord = () => {
     if (newChord && CHORDS[newChord]) {
@@ -515,42 +463,54 @@ export default function ChordTrainer() {
     }
     prevActiveIndexRef.current = current;
     prevTickRef.current = tick;
-  }, [current, recording, activeSequence, tick]);
+  }, [current, recording, activeSequence, tick, flushAndMaybeRestart]);
 
 
   return (
     <div className="trainer-container">
       <h1 className="trainer-title">🎸 Practice Guitar Chords</h1>
-      <div className="chord-display">
-        {activeSequence.map((chord, index) => (
-          <motion.div
-            key={index === current ? `current-${index}-${tick}` : index}
-            initial={{ x: 200 }}
-            animate={{ x: index === current ? 0 : -200, opacity: index === current ? 1 : 0 }}
-            transition={{ duration: 0.8 }}
-            className="absolute"
-          >
-            <ChordDiagram chordName={chord} positions={CHORDS[chord] || []} />
-          </motion.div>
-        ))}
-      </div>
+      {/* Dataset capture mode */}
+      <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <input type="checkbox" checked={datasetMode} onChange={(e) => setDatasetMode(e.target.checked)} />
+        <span style={{ fontSize: 12 }}>Dataset capture mode</span>
+      </label>
+      {datasetMode && (
+        <div style={{ marginLeft: 8 }}>
+          <DatasetCapture onCaptured={(name, meta, wavBlob, metaBlob) => {
+            console.log('Captured', name, meta);
+            console.log('WAV blob:', wavBlob);
+            console.log('Meta blob:', metaBlob);
+          }} />
+        </div>
+      )}
+      {!datasetMode && (<>
+        <div className="chord-display">
+          {activeSequence.map((chord, index) => (
+            <motion.div
+              key={index === current ? `current-${index}-${tick}` : index}
+              initial={{ x: 200 }}
+              animate={{ x: index === current ? 0 : -200, opacity: index === current ? 1 : 0 }}
+              transition={{ duration: 0.8 }}
+              className="absolute"
+            >
+              <ChordDiagram chordName={chord} positions={CHORDS[chord] || []} />
+            </motion.div>
+          ))}
+        </div>
 
-      <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-        <button className="btn" onClick={() => setPlaying(!playing)}>
-          {playing ? "⏸ Pause" : "▶ Play"}
-        </button>
-        {!recording ? (
-          <button className="btn record" onClick={startRecording}>● Record</button>
-        ) : (
-          <button className="btn stop" onClick={stopRecording}>■ Stop</button>
-        )}
-        {/* {!recording && recordingsList.length > 0 && (
-          <button className="btn" onClick={downloadAllWavs}>📥 Download all WAVs</button>
-        )} */}
-        {recording && <span style={{ marginLeft: 8, color: "red" }}>● Recording {sequence[current]}</span>}
-      </div> 
-      <div className="card">
-        <div className="card-content">
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+          <button className="btn" onClick={() => setPlaying(!playing)}>
+            {playing ? "⏸ Pause" : "▶ Play"}
+          </button>
+          {!recording ? (
+            <button className="btn record" onClick={startRecording}>● Record</button>
+          ) : (
+            <button className="btn stop" onClick={stopRecording}>■ Stop</button>
+          )}
+          {recording && <span style={{ marginLeft: 8, color: "red" }}>● Recording {sequence[current]}</span>}
+        </div>
+        <div className="card">
+          <div className="card-content">
             <div className="input-group">
               <input
                 className="input"
@@ -581,59 +541,58 @@ export default function ChordTrainer() {
                 </div>
               )}
               <button className="btn" onClick={addChord}>Add</button>
-          </div>
-
-
-          <div className="sequence-list">
-            {sequence.map((chord, i) => {
-              const isActive = soloIndex !== null ? (i === soloIndex && current === 0) : i === current;
-              return (
-                <div
-                  key={i}
-                  className={`sequence-item ${isActive ? "active" : ""} ${i === soloIndex ? "solo" : ""}`}
-                  onClick={() => setSoloIndex(i === soloIndex ? null : i)}
-                >
-                  <ChordDiagram chordName={chord} positions={CHORDS[chord]} small={true} />
-                  <span>{chord}</span>
-                  <button className="remove-btn" onClick={(e) => { e.stopPropagation(); removeChord(i); }}>✕</button>
-                </div>
-              );
-            })}
             </div>
 
-          {recordingsList.length > 0 && (
-            <div className="recordings-list">
-              <label className="label">Recordings</label>
-              <ul>
-                {recordingsList.map((r, i) => (
-                  <li key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span>
-                      {r.name} ({Math.round(r.size / 1000)} KB)
-                    </span>
-                    <button className="btn" onClick={() => downloadWavFile(i)}>Download WAV</button>
-                    <button
-                      className="btn"
-                      onClick={() => playRecording(i)}
-                    >Play</button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
-          <div>
-            <label className="label">Tempo (ms per chord)</label>
-            <input
-              className="input"
-              type="number"
-              value={tempo}
-              onChange={(e) => setTempo(Number(e.target.value))}
-            />
+            <div className="sequence-list">
+              {sequence.map((chord, i) => {
+                const isActive = soloIndex !== null ? (i === soloIndex && current === 0) : i === current;
+                return (
+                  <div
+                    key={i}
+                    className={`sequence-item ${isActive ? "active" : ""} ${i === soloIndex ? "solo" : ""}`}
+                    onClick={() => setSoloIndex(i === soloIndex ? null : i)}
+                  >
+                    <ChordDiagram chordName={chord} positions={CHORDS[chord]} small={true} />
+                    <span>{chord}</span>
+                    <button className="remove-btn" onClick={(e) => { e.stopPropagation(); removeChord(i); }}>✕</button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {recordingsList.length > 0 && (
+              <div className="recordings-list">
+                <label className="label">Recordings</label>
+                <ul>
+                  {recordingsList.map((r, i) => (
+                    <li key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <span>
+                        {r.name} ({Math.round(r.size / 1000)} KB)
+                      </span>
+                      <button className="btn" onClick={() => downloadWavFile(i)}>Download WAV</button>
+                      <button
+                        className="btn"
+                        onClick={() => playRecording(i)}
+                      >Play</button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div>
+              <label className="label">Tempo (ms per chord)</label>
+              <input
+                className="input"
+                type="number"
+                value={tempo}
+                onChange={(e) => setTempo(Number(e.target.value))}
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      
+      </>)}
     </div>
   );
 }

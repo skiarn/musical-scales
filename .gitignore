@@ -46,3 +46,4 @@ __pycache__/
 *.pyc
 ./ai/aienv/
 ai/aienv/*
+certificates
