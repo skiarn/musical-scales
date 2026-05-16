@@ -572,7 +572,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                                 }
                                 totalEnergy = sum.reduce((acc, v) => acc + v * v, 0);
                             }
-                            return <ComponentEnergyBarChart energies={energies} totalEnergy={totalEnergy} labels={frequencyComponents.map((c, i) => `${c.centerFrequency.toFixed(1)} Hz`)} />;
+                            return <ComponentEnergyBarChart energies={energies} totalEnergy={totalEnergy} labels={frequencyComponents.map(c => `${c.centerFrequency.toFixed(1)} Hz`)} />;
                         })()
                     )}
 
