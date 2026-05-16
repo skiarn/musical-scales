@@ -94,6 +94,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     const [frequencyComponents, setFrequencyComponents] = useState<ExtractedFrequencyComponent[]>([]);
     const [activeComponentIndex, setActiveComponentIndex] = useState<number | null>(null);
     const [expandedComponentIndex, setExpandedComponentIndex] = useState<number | null>(null);
+    const [isPlayingCombinedComponents, setIsPlayingCombinedComponents] = useState(false);
     /** Waveform tab: filtered copy of `data` produced by WaveformFilter (display-only). */
     const [filteredWaveData, setFilteredWaveData] = useState<{ x: number; y: number }[]>([]);
     /** Persisted WaveformFilter selections — kept here so they survive tab switches. */
@@ -169,6 +170,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
         componentAudioCtxRef.current?.close();
         componentAudioCtxRef.current = null;
         setActiveComponentIndex(null);
+        setIsPlayingCombinedComponents(false);
     }, []);
 
     const playWaveform = useCallback(() => {
@@ -322,6 +324,61 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
         setNewData(channelData, sampleRate);
     }, [frequencyComponents, setNewData, sampleRate, componentGainDb, normalizeComponentAudio]);
 
+    const buildCombinedComponentWave = useCallback(() => {
+        if (frequencyComponents.length === 0) return null;
+        const length = frequencyComponents[0].waveform.length;
+        if (length === 0) return null;
+
+        const sum = new Array<number>(length).fill(0);
+        for (const component of frequencyComponents) {
+            for (let i = 0; i < length; i++) {
+                sum[i] += component.waveform[i]?.y ?? 0;
+            }
+        }
+
+        const peak = sum.reduce((max, value) => Math.max(max, Math.abs(value)), 1e-9);
+        const targetPeak = 0.9;
+        const normalizeScale = normalizeComponentAudio ? Math.min(8, targetPeak / peak) : 1;
+        const gainScale = Math.pow(10, componentGainDb / 20);
+        const finalScale = Math.min(12, normalizeScale * gainScale);
+        const boosted = sum.map(value => Math.max(-1, Math.min(1, value * finalScale)));
+
+        return new Float32Array(boosted);
+    }, [frequencyComponents, componentGainDb, normalizeComponentAudio]);
+
+    const playCombinedFrequencyComponents = useCallback(() => {
+        if (isPlayingCombinedComponents) {
+            stopComponentPlayback();
+            return;
+        }
+
+        const combined = buildCombinedComponentWave();
+        if (!combined || combined.length === 0) return;
+
+        stopComponentPlayback();
+        const audioCtx = new (window.AudioContext || (window as Window).webkitAudioContext)();
+        const buffer = audioCtx.createBuffer(1, combined.length, sampleRate);
+        const channelData = buffer.getChannelData(0);
+        channelData.set(combined);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        source.onended = () => setIsPlayingCombinedComponents(false);
+        source.start();
+
+        componentSourceRef.current = source;
+        componentAudioCtxRef.current = audioCtx;
+        setActiveComponentIndex(null);
+        setIsPlayingCombinedComponents(true);
+    }, [isPlayingCombinedComponents, buildCombinedComponentWave, sampleRate, stopComponentPlayback]);
+
+    const loadCombinedFrequencyComponentsIntoWave = useCallback(() => {
+        const combined = buildCombinedComponentWave();
+        if (!combined || combined.length === 0) return;
+        setNewData(combined, sampleRate);
+    }, [buildCombinedComponentWave, setNewData, sampleRate]);
+
     const buildWavePreviewPath = useCallback((waveform: { x: number; y: number }[], width = 560, height = 140) => {
         if (waveform.length === 0) return "";
         const points = Math.min(420, waveform.length);
@@ -397,6 +454,66 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                     >
                         {isPlayingWave ? "⏹ Stop" : "▶ Play"}
                     </button>
+                    <button
+                        onClick={() => {
+                            // Export current waveform as WAV
+                            const waveData = filteredWaveData.length > 0 ? filteredWaveData : data;
+                            if (!waveData.length) return;
+                            // Convert to Float32Array
+                            const arr = new Float32Array(waveData.map(p => p.y));
+                            // Dynamically import float32ToWav
+                            import("../utils/wav").then(({ float32ToWav }) => {
+                                const blob = float32ToWav(arr, sampleRate);
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = "waveform.wav";
+                                document.body.appendChild(a);
+                                a.click();
+                                setTimeout(() => {
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                }, 200);
+                            });
+                        }}
+                        disabled={data.length === 0}
+                        style={{
+                            padding: "0.3rem 1rem",
+                            borderRadius: "4px",
+                            border: "1px solid #555",
+                            background: "#2980b9",
+                            color: "#fff",
+                            cursor: data.length === 0 ? "not-allowed" : "pointer",
+                            fontSize: "0.9rem",
+                        }}
+                    >
+                        ⬇ Download as WAV
+                    </button>
+                    <label style={{
+                        padding: "0.3rem 1rem",
+                        borderRadius: "4px",
+                        border: "1px solid #555",
+                        background: "#8e44ad",
+                        color: "#fff",
+                        cursor: "pointer",
+                        fontSize: "0.9rem",
+                        marginBottom: 0
+                    }}>
+                        ⬆ Import WAV/MP4
+                        <input
+                            type="file"
+                            accept="audio/wav, audio/mp4, audio/mpeg, audio/x-m4a, audio/webm, audio/aac, audio/ogg, video/mp4"
+                            style={{ display: "none" }}
+                            onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const url = URL.createObjectURL(file);
+                                await loadAudioFileToData(url, setNewData);
+                                setTimeout(() => URL.revokeObjectURL(url), 1000);
+                                e.target.value = "";
+                            }}
+                        />
+                    </label>
                 </div>
                 <WaveformFilter
                     data={data}
@@ -491,6 +608,20 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                             />
                             Auto normalize
                         </label>
+                        <button
+                            type="button"
+                            onClick={playCombinedFrequencyComponents}
+                            disabled={frequencyComponents.length === 0}
+                        >
+                            {isPlayingCombinedComponents ? "Stop Combined" : "Play Combined"}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={loadCombinedFrequencyComponentsIntoWave}
+                            disabled={frequencyComponents.length === 0}
+                        >
+                            Load Combined to Wave
+                        </button>
                     </div>
 
                     {frequencyComponents.length === 0 ? (
