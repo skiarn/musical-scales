@@ -360,9 +360,17 @@ const FFTWaveView: React.FC<FFTWaveViewProps> = ({ data }) => {
 
   return (
     <div ref={containerRef}>
-      <canvas ref={canvasRef} style={{ width: '100%', height: size.height }} />
-      <svg ref={svgRef} style={{ position: 'relative', top: -size.height, pointerEvents: 'auto' }} />
-      <div className="noise-info" style={{ marginTop: size.height + 8 }}>
+      <div style={{ position: 'relative', width: '100%', height: size.height }}>
+        <canvas
+          ref={canvasRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+        />
+        <svg
+          ref={svgRef}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'auto' }}
+        />
+      </div>
+      <div className="noise-info" style={{ marginTop: 8 }}>
         <small>Noise Level: {formatValue(calculateNoiseLevel, calculateNoiseLevel)}</small>
         <br />
         <small>Samples: {data.length}</small>

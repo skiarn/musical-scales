@@ -184,3 +184,92 @@ export const filterFFTData = (fftData: { frequency: number; amplitude: number }[
   };
 };
 
+export interface ExtractFrequencyComponentsOptions {
+  topN?: number;
+  minFreq?: number;
+  maxFreq?: number;
+  minSnr?: number;
+  bandwidthHz?: number;
+}
+
+export interface ExtractedFrequencyComponent {
+  centerFrequency: number;
+  amplitude: number;
+  snr: number;
+  waveform: { x: number; y: number }[];
+}
+
+export const extractFrequencyComponents = (
+  data: { x: number; y: number }[],
+  sampleRate: number,
+  options: ExtractFrequencyComponentsOptions = {}
+): ExtractedFrequencyComponent[] => {
+  const {
+    topN = 5,
+    minFreq = 20,
+    maxFreq = sampleRate / 2,
+    minSnr = 3,
+    bandwidthHz = 20,
+  } = options;
+
+  const N = data.length;
+  if (N === 0 || sampleRate <= 0) return [];
+
+  const paddedLength = 2 ** Math.ceil(Math.log2(Math.max(N, 2)));
+  const real = new Array(paddedLength).fill(0).map((_, i) => (i < N ? data[i].y : 0));
+  const imag = new Array(paddedLength).fill(0);
+  radix2FFT(real, imag);
+
+  const half = Math.floor(paddedLength / 2);
+  const bins = Array.from({ length: half }, (_, i) => {
+    const frequency = (i * sampleRate) / paddedLength;
+    const amplitude = Math.sqrt(real[i] ** 2 + imag[i] ** 2) / paddedLength;
+    return { bin: i, frequency, amplitude };
+  });
+
+  const inBandBins = bins.filter(b => b.frequency >= minFreq && b.frequency <= maxFreq);
+  if (inBandBins.length === 0) return [];
+
+  const sortedAmps = inBandBins.map(b => b.amplitude).sort((a, b) => a - b);
+  const noiseIndex = Math.max(0, Math.floor(sortedAmps.length * 0.15) - 1);
+  const noiseFloor = Math.max(1e-12, sortedAmps[noiseIndex] || 1e-12);
+
+  const peaks = inBandBins
+    .filter((b, idx, arr) => {
+      const prev = idx > 0 ? arr[idx - 1].amplitude : -Infinity;
+      const next = idx < arr.length - 1 ? arr[idx + 1].amplitude : -Infinity;
+      return b.amplitude >= prev && b.amplitude >= next && b.amplitude / noiseFloor >= minSnr;
+    })
+    .sort((a, b) => b.amplitude - a.amplitude)
+    .slice(0, Math.max(1, topN));
+
+  const bandwidthBins = Math.max(1, Math.round((bandwidthHz * paddedLength) / sampleRate));
+  const sigma = Math.max(1, bandwidthBins / 2);
+
+  const components: ExtractedFrequencyComponent[] = peaks.map(peak => {
+    const compReal = new Array(paddedLength).fill(0);
+    const compImag = new Array(paddedLength).fill(0);
+
+    for (let k = 0; k < paddedLength; k++) {
+      const d1 = Math.abs(k - peak.bin);
+      const d2 = Math.abs(k - (paddedLength - peak.bin));
+      const d = Math.min(d1, d2);
+      if (d > bandwidthBins) continue;
+      const weight = Math.exp(-0.5 * (d / sigma) ** 2);
+      compReal[k] = real[k] * weight;
+      compImag[k] = imag[k] * weight;
+    }
+
+    ifft(compReal, compImag);
+
+    return {
+      centerFrequency: peak.frequency,
+      amplitude: peak.amplitude,
+      snr: peak.amplitude / noiseFloor,
+      waveform: data.map((point, i) => ({ x: point.x, y: compReal[i] })),
+    };
+  });
+
+  return components;
+};
+

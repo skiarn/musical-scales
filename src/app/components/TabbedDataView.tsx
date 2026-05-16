@@ -3,7 +3,12 @@ import WaveView, { FuncFilter, FuncTransform, FuncZoom } from "./visualization/W
 import AudioRecorder from "./audio/AudioRecorder";
 import FFTView from "./visualization/FFTWaveView";
 import "./DataView.css";
-import { computeFFT, transformFFTData } from "../utils/fft";
+import {
+    computeFFT,
+    transformFFTData,
+    extractFrequencyComponents,
+    type ExtractedFrequencyComponent,
+} from "../utils/fft";
 import { GuitarSection } from "./guitar/GuitarSection";
 import FrequencyFilter from "./filters/FrequencyFilter";
 import WaveformFilter from "./filters/WaveformFilter";
@@ -81,6 +86,14 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     const [dataFFT, setDataFFT] = useState<{ x: number; y: number }[]>([]);
     const [maxFreq, setMaxFreq] = useState<number>(defaultMaxFreq);
     const [minFreq, setMinFreq] = useState(0);
+    const [componentTopN, setComponentTopN] = useState(5);
+    const [componentBandwidthHz, setComponentBandwidthHz] = useState(20);
+    const [componentMinSnr, setComponentMinSnr] = useState(3);
+    const [componentGainDb, setComponentGainDb] = useState(18);
+    const [normalizeComponentAudio, setNormalizeComponentAudio] = useState(true);
+    const [frequencyComponents, setFrequencyComponents] = useState<ExtractedFrequencyComponent[]>([]);
+    const [activeComponentIndex, setActiveComponentIndex] = useState<number | null>(null);
+    const [expandedComponentIndex, setExpandedComponentIndex] = useState<number | null>(null);
     /** Waveform tab: filtered copy of `data` produced by WaveformFilter (display-only). */
     const [filteredWaveData, setFilteredWaveData] = useState<{ x: number; y: number }[]>([]);
     /** Persisted WaveformFilter selections — kept here so they survive tab switches. */
@@ -139,6 +152,8 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     const [isPlayingWave, setIsPlayingWave] = useState(false);
     const waveSourceRef = useRef<AudioBufferSourceNode | null>(null);
     const waveAudioCtxRef = useRef<AudioContext | null>(null);
+    const componentSourceRef = useRef<AudioBufferSourceNode | null>(null);
+    const componentAudioCtxRef = useRef<AudioContext | null>(null);
 
     const stopWavePlayback = useCallback(() => {
         waveSourceRef.current?.stop();
@@ -146,6 +161,14 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
         waveAudioCtxRef.current?.close();
         waveAudioCtxRef.current = null;
         setIsPlayingWave(false);
+    }, []);
+
+    const stopComponentPlayback = useCallback(() => {
+        componentSourceRef.current?.stop();
+        componentSourceRef.current = null;
+        componentAudioCtxRef.current?.close();
+        componentAudioCtxRef.current = null;
+        setActiveComponentIndex(null);
     }, []);
 
     const playWaveform = useCallback(() => {
@@ -173,7 +196,10 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
     }, [isPlayingWave, filteredWaveData, data, sampleRate, stopWavePlayback]);
 
     // Stop playback when the source data changes
-    useEffect(() => { stopWavePlayback(); }, [data]);
+    useEffect(() => {
+        stopWavePlayback();
+        stopComponentPlayback();
+    }, [data, stopWavePlayback, stopComponentPlayback]);
 
     const worker = useMemo(() => {
         if (typeof window !== "undefined") {
@@ -203,6 +229,39 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
         }
     }, [fftInputData, sampleRate]);
 
+    useEffect(() => {
+        if (fftInputData.length === 0) {
+            setFrequencyComponents([]);
+            return;
+        }
+
+        const components = extractFrequencyComponents(fftInputData, sampleRate, {
+            topN: componentTopN,
+            minFreq: minFreq,
+            maxFreq: maxFreq,
+            minSnr: componentMinSnr,
+            bandwidthHz: componentBandwidthHz,
+        });
+
+        setFrequencyComponents(components);
+        if (activeComponentIndex !== null && activeComponentIndex >= components.length) {
+            setActiveComponentIndex(null);
+        }
+        if (expandedComponentIndex !== null && expandedComponentIndex >= components.length) {
+            setExpandedComponentIndex(null);
+        }
+    }, [
+        fftInputData,
+        sampleRate,
+        componentTopN,
+        componentBandwidthHz,
+        componentMinSnr,
+        minFreq,
+        maxFreq,
+        activeComponentIndex,
+        expandedComponentIndex,
+    ]);
+
     const handleAudioStop = (channelData: Float32Array, sampleRate: number) => {
         setNewData(channelData, sampleRate);
     };
@@ -214,6 +273,72 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
         },
         []
     );
+
+    const playFrequencyComponent = useCallback((index: number) => {
+        const component = frequencyComponents[index];
+        if (!component) return;
+
+        if (activeComponentIndex === index) {
+            stopComponentPlayback();
+            return;
+        }
+
+        stopComponentPlayback();
+
+        const audioCtx = new (window.AudioContext || (window as Window).webkitAudioContext)();
+        const buffer = audioCtx.createBuffer(1, component.waveform.length, sampleRate);
+        const channelData = buffer.getChannelData(0);
+        const raw = component.waveform.map(point => point.y);
+        const peak = raw.reduce((max, value) => Math.max(max, Math.abs(value)), 1e-9);
+        const targetPeak = 0.9;
+        const normalizeScale = normalizeComponentAudio ? Math.min(8, targetPeak / peak) : 1;
+        const gainScale = Math.pow(10, componentGainDb / 20);
+        const finalScale = Math.min(12, normalizeScale * gainScale);
+        for (let i = 0; i < component.waveform.length; i++) {
+            const boosted = raw[i] * finalScale;
+            channelData[i] = Math.max(-1, Math.min(1, boosted));
+        }
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioCtx.destination);
+        source.onended = () => setActiveComponentIndex(null);
+        source.start();
+
+        componentSourceRef.current = source;
+        componentAudioCtxRef.current = audioCtx;
+        setActiveComponentIndex(index);
+    }, [frequencyComponents, activeComponentIndex, sampleRate, stopComponentPlayback, componentGainDb, normalizeComponentAudio]);
+
+    const loadComponentIntoWave = useCallback((index: number) => {
+        const component = frequencyComponents[index];
+        if (!component) return;
+        const raw = component.waveform.map(point => point.y);
+        const peak = raw.reduce((max, value) => Math.max(max, Math.abs(value)), 1e-9);
+        const normalizeScale = normalizeComponentAudio ? Math.min(8, 0.9 / peak) : 1;
+        const gainScale = Math.pow(10, componentGainDb / 20);
+        const finalScale = Math.min(12, normalizeScale * gainScale);
+        const channelData = new Float32Array(raw.map(value => Math.max(-1, Math.min(1, value * finalScale))));
+        setNewData(channelData, sampleRate);
+    }, [frequencyComponents, setNewData, sampleRate, componentGainDb, normalizeComponentAudio]);
+
+    const buildWavePreviewPath = useCallback((waveform: { x: number; y: number }[], width = 560, height = 140) => {
+        if (waveform.length === 0) return "";
+        const points = Math.min(420, waveform.length);
+        const step = Math.max(1, Math.floor(waveform.length / points));
+        const sampled: number[] = [];
+        for (let i = 0; i < waveform.length; i += step) sampled.push(waveform[i].y);
+        if (sampled.length < 2) return "";
+
+        const maxAbs = sampled.reduce((m, v) => Math.max(m, Math.abs(v)), 1e-9);
+        return sampled
+            .map((value, i) => {
+                const x = (i / (sampled.length - 1)) * width;
+                const y = height / 2 - (value / maxAbs) * (height * 0.42);
+                return `${i === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
+            })
+            .join(" ");
+    }, []);
 
     return (
         <Tabs defaultValue="guitar" className={className}>
@@ -305,6 +430,129 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                     onFilterChange={filterChange}
                 />
                 <FFTView data={dataFFT.filter(point => point.x >= minFreq && point.x <= maxFreq)} />
+
+                <div style={{ marginTop: "1rem", borderTop: "1px solid rgba(255,255,255,0.15)", paddingTop: "1rem" }}>
+                    <h2 style={{ margin: "0 0 0.5rem" }}>Separated Frequency Components</h2>
+                    <p style={{ margin: "0 0 0.6rem", opacity: 0.85 }}>
+                        This performs narrow-band demodulation around dominant FFT peaks and reconstructs each component wave.
+                    </p>
+
+                    <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap", marginBottom: "0.75rem" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            Components
+                            <input
+                                type="number"
+                                min={1}
+                                max={12}
+                                value={componentTopN}
+                                onChange={(e) => setComponentTopN(Math.max(1, Math.min(12, Number(e.target.value) || 1)))}
+                                style={{ width: "64px" }}
+                            />
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            Bandwidth (Hz)
+                            <input
+                                type="number"
+                                min={1}
+                                max={500}
+                                value={componentBandwidthHz}
+                                onChange={(e) => setComponentBandwidthHz(Math.max(1, Number(e.target.value) || 1))}
+                                style={{ width: "84px" }}
+                            />
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            Min SNR
+                            <input
+                                type="number"
+                                min={1}
+                                max={50}
+                                value={componentMinSnr}
+                                onChange={(e) => setComponentMinSnr(Math.max(1, Number(e.target.value) || 1))}
+                                style={{ width: "64px" }}
+                            />
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            Boost (dB)
+                            <input
+                                type="range"
+                                min={-12}
+                                max={36}
+                                step={1}
+                                value={componentGainDb}
+                                onChange={(e) => setComponentGainDb(Number(e.target.value) || 0)}
+                            />
+                            <span style={{ minWidth: "48px", textAlign: "right" }}>{componentGainDb} dB</span>
+                        </label>
+                        <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            <input
+                                type="checkbox"
+                                checked={normalizeComponentAudio}
+                                onChange={(e) => setNormalizeComponentAudio(e.target.checked)}
+                            />
+                            Auto normalize
+                        </label>
+                    </div>
+
+                    {frequencyComponents.length === 0 ? (
+                        <small>No dominant components detected in current FFT range.</small>
+                    ) : (
+                        <div style={{ display: "grid", gap: "0.4rem" }}>
+                            {frequencyComponents.map((component, idx) => (
+                                <div
+                                    key={`component-${idx}-${component.centerFrequency}`}
+                                    style={{
+                                        display: "grid",
+                                        gap: "0.65rem",
+                                        padding: "0.45rem 0.6rem",
+                                        borderRadius: "6px",
+                                        border: "1px solid rgba(255,255,255,0.15)",
+                                        background: activeComponentIndex === idx ? "rgba(39,174,96,0.25)" : "rgba(255,255,255,0.03)",
+                                    }}
+                                    onClick={() => setExpandedComponentIndex(prev => (prev === idx ? null : idx))}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+                                        <div>
+                                            <strong>{component.centerFrequency.toFixed(2)} Hz</strong>
+                                            <div style={{ fontSize: "0.85rem", opacity: 0.85 }}>
+                                                Amplitude {component.amplitude.toExponential(2)} | SNR {component.snr.toFixed(1)} | {expandedComponentIndex === idx ? "Click to collapse" : "Click to expand wave"}
+                                            </div>
+                                        </div>
+                                        <div style={{ display: "flex", gap: "0.45rem" }}>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    playFrequencyComponent(idx);
+                                                }}
+                                            >
+                                                {activeComponentIndex === idx ? "Stop" : "Play"}
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    loadComponentIntoWave(idx);
+                                                }}
+                                            >
+                                                Load to Wave
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {expandedComponentIndex === idx && (
+                                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.14)", paddingTop: "0.5rem" }}>
+                                            <svg viewBox="0 0 560 140" style={{ width: "100%", height: "120px", display: "block", background: "rgba(10,20,35,0.35)", borderRadius: "6px" }}>
+                                                <line x1="0" y1="70" x2="560" y2="70" stroke="rgba(255,255,255,0.24)" strokeWidth="1" />
+                                                <path d={buildWavePreviewPath(component.waveform)} fill="none" stroke="#66d9ff" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                                            </svg>
+                                            <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", opacity: 0.85 }}>
+                                                Reconstructed component waveform preview ({component.waveform.length.toLocaleString()} samples)
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </TabsContent>
 
             <TabsContent value="analysis">
