@@ -20,6 +20,7 @@ import AudioSequencer from "./audio/AudioSequencer";
 import type { AudioClip } from "../types/types";
 import ChordTrainer from "./guitar/ChordTrainer";
 import GuitarMenu from "./guitar/GuitarMenu";
+import WaveExperimentalInput from "./wave/WaveExperimentalInput";
 
 interface TabbedDataViewProps {
     data: { x: number; y: number }[];
@@ -525,6 +526,7 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                     onCutoffChange={setWaveCutoffHz}
                     onFilteredData={setFilteredWaveData}
                 />
+                <WaveExperimentalInput onDataCaptured={setNewData} />
                 <WaveView
                     data={filteredWaveData.length > 0 ? filteredWaveData : data}
                     onTransform={handleWaveTransform}
