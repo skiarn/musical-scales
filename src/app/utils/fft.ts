@@ -190,6 +190,7 @@ export interface ExtractFrequencyComponentsOptions {
   maxFreq?: number;
   minSnr?: number;
   bandwidthHz?: number;
+  peakSeparationHz?: number;
 }
 
 export interface ExtractedFrequencyComponent {
@@ -210,6 +211,7 @@ export const extractFrequencyComponents = (
     maxFreq = sampleRate / 2,
     minSnr = 3,
     bandwidthHz = 20,
+    peakSeparationHz,
   } = options;
 
   const N = data.length;
@@ -234,14 +236,25 @@ export const extractFrequencyComponents = (
   const noiseIndex = Math.max(0, Math.floor(sortedAmps.length * 0.15) - 1);
   const noiseFloor = Math.max(1e-12, sortedAmps[noiseIndex] || 1e-12);
 
-  const peaks = inBandBins
+  const localPeaks = inBandBins
     .filter((b, idx, arr) => {
       const prev = idx > 0 ? arr[idx - 1].amplitude : -Infinity;
       const next = idx < arr.length - 1 ? arr[idx + 1].amplitude : -Infinity;
-      return b.amplitude >= prev && b.amplitude >= next && b.amplitude / noiseFloor >= minSnr;
+      // Use strict one-side comparison to avoid selecting flat-top duplicates.
+      const isLocalMax = b.amplitude > prev && b.amplitude >= next;
+      return isLocalMax && b.amplitude / noiseFloor >= minSnr;
     })
-    .sort((a, b) => b.amplitude - a.amplitude)
-    .slice(0, Math.max(1, topN));
+    .sort((a, b) => b.amplitude - a.amplitude);
+
+  // Keep peaks frequency-separated so one resonance doesn't consume multiple slots.
+  const minSeparationHz = Math.max(2, peakSeparationHz ?? bandwidthHz * 0.75);
+  const peaks: Array<{ bin: number; frequency: number; amplitude: number }> = [];
+  for (const candidate of localPeaks) {
+    const tooClose = peaks.some(p => Math.abs(p.frequency - candidate.frequency) < minSeparationHz);
+    if (tooClose) continue;
+    peaks.push(candidate);
+    if (peaks.length >= Math.max(1, topN)) break;
+  }
 
   const bandwidthBins = Math.max(1, Math.round((bandwidthHz * paddedLength) / sampleRate));
   const sigma = Math.max(1, bandwidthBins / 2);
