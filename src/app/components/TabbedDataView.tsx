@@ -14,6 +14,7 @@ import FrequencyFilter from "./filters/FrequencyFilter";
 import WaveformFilter from "./filters/WaveformFilter";
 import type { WaveFilterType } from "./filters/WaveformFilter";
 import FrequencyAnalyzer from "./analysis/FrequencyAnalyzer";
+import { ComponentEnergyBarChart } from "./analysis/ComponentEnergyBarChart";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./layout/tabs";
 import AudioSequencer from "./audio/AudioSequencer";
 import type { AudioClip } from "../types/types";
@@ -554,6 +555,25 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                         This performs narrow-band demodulation around dominant FFT peaks and reconstructs each component wave.
                     </p>
 
+                    {/* Energy Bar Chart Visualization */}
+                    {frequencyComponents.length > 0 && (
+                        (() => {
+                            // Compute energy for each component and total
+                            const energies = frequencyComponents.map(c => c.waveform.reduce((sum, p) => sum + p.y * p.y, 0));
+                            // For total, use the sum of all component waveforms (combined)
+                            let totalEnergy = 0;
+                            if (frequencyComponents[0]?.waveform) {
+                                const length = frequencyComponents[0].waveform.length;
+                                const sum = new Array(length).fill(0);
+                                for (const c of frequencyComponents) {
+                                    for (let i = 0; i < length; i++) sum[i] += c.waveform[i]?.y ?? 0;
+                                }
+                                totalEnergy = sum.reduce((acc, v) => acc + v * v, 0);
+                            }
+                            return <ComponentEnergyBarChart energies={energies} totalEnergy={totalEnergy} labels={frequencyComponents.map((c, i) => `${c.centerFrequency.toFixed(1)} Hz`)} />;
+                        })()
+                    )}
+
                     <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap", marginBottom: "0.75rem" }}>
                         <label style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
                             Components
@@ -628,59 +648,96 @@ const TabbedDataView: React.FC<TabbedDataViewProps> = ({
                         <small>No dominant components detected in current FFT range.</small>
                     ) : (
                         <div style={{ display: "grid", gap: "0.4rem" }}>
-                            {frequencyComponents.map((component, idx) => (
-                                <div
-                                    key={`component-${idx}-${component.centerFrequency}`}
-                                    style={{
-                                        display: "grid",
-                                        gap: "0.65rem",
-                                        padding: "0.45rem 0.6rem",
-                                        borderRadius: "6px",
-                                        border: "1px solid rgba(255,255,255,0.15)",
-                                        background: activeComponentIndex === idx ? "rgba(39,174,96,0.25)" : "rgba(255,255,255,0.03)",
-                                    }}
-                                    onClick={() => setExpandedComponentIndex(prev => (prev === idx ? null : idx))}
-                                >
-                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
-                                        <div>
-                                            <strong>{component.centerFrequency.toFixed(2)} Hz</strong>
-                                            <div style={{ fontSize: "0.85rem", opacity: 0.85 }}>
-                                                Amplitude {component.amplitude.toExponential(2)} | SNR {component.snr.toFixed(1)} | {expandedComponentIndex === idx ? "Click to collapse" : "Click to expand wave"}
-                                            </div>
+                            {/* Compute energies for per-item bars */}
+                            {(() => {
+                                const energies = frequencyComponents.map(c => c.waveform.reduce((sum, p) => sum + p.y * p.y, 0));
+                                let totalEnergy = 0;
+                                if (frequencyComponents[0]?.waveform) {
+                                    const length = frequencyComponents[0].waveform.length;
+                                    const sum = new Array(length).fill(0);
+                                    for (const c of frequencyComponents) {
+                                        for (let i = 0; i < length; i++) sum[i] += c.waveform[i]?.y ?? 0;
+                                    }
+                                    totalEnergy = sum.reduce((acc, v) => acc + v * v, 0);
+                                }
+                                const COLORS = [
+                                    "#4FD1C5", "#66d9ff", "#f6c177", "#e06c75", "#a9a1e1", "#98c379", "#ffb86c", "#ff79c6", "#bd93f9", "#50fa7b", "#ff5555", "#f1fa8c"
+                                ];
+                                return frequencyComponents.map((component, idx) => (
+                                    <div
+                                        key={`component-${idx}-${component.centerFrequency}`}
+                                        style={{
+                                            display: "grid",
+                                            gridTemplateColumns: "24px 1fr",
+                                            gap: "0.65rem",
+                                            padding: "0.45rem 0.6rem",
+                                            borderRadius: "6px",
+                                            border: "1px solid rgba(255,255,255,0.15)",
+                                            background: activeComponentIndex === idx ? "rgba(39,174,96,0.25)" : "rgba(255,255,255,0.03)",
+                                            alignItems: "center"
+                                        }}
+                                        onClick={() => setExpandedComponentIndex(prev => (prev === idx ? null : idx))}
+                                    >
+                                        {/* Vertical energy bar */}
+                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "center" }}>
+                                            <div
+                                                style={{
+                                                    width: 12,
+                                                    height: `${Math.max(12, 80 * energies[idx] / (totalEnergy || 1e-9))}px`,
+                                                    background: COLORS[idx % COLORS.length],
+                                                    borderRadius: 3,
+                                                    marginBottom: 2,
+                                                    marginTop: 2,
+                                                    boxShadow: "0 1px 4px rgba(0,0,0,0.08)",
+                                                    transition: "height 0.3s"
+                                                }}
+                                                title={`Energy: ${energies[idx].toExponential(2)} (${((energies[idx] / (totalEnergy || 1e-9)) * 100).toFixed(1)}%)`}
+                                            />
+                                            <div style={{ fontSize: 10, color: "#bfc9d4", textAlign: "center", maxWidth: 24, wordBreak: "break-all" }}>{((energies[idx] / (totalEnergy || 1e-9)) * 100).toFixed(0)}%</div>
                                         </div>
-                                        <div style={{ display: "flex", gap: "0.45rem" }}>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    playFrequencyComponent(idx);
-                                                }}
-                                            >
-                                                {activeComponentIndex === idx ? "Stop" : "Play"}
-                                            </button>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    loadComponentIntoWave(idx);
-                                                }}
-                                            >
-                                                Load to Wave
-                                            </button>
+                                        <div>
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem" }}>
+                                                <div>
+                                                    <strong>{component.centerFrequency.toFixed(2)} Hz</strong>
+                                                    <div style={{ fontSize: "0.85rem", opacity: 0.85 }}>
+                                                        Amplitude {component.amplitude.toExponential(2)} | SNR {component.snr.toFixed(1)} | {expandedComponentIndex === idx ? "Click to collapse" : "Click to expand wave"}
+                                                    </div>
+                                                </div>
+                                                <div style={{ display: "flex", gap: "0.45rem" }}>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            playFrequencyComponent(idx);
+                                                        }}
+                                                    >
+                                                        {activeComponentIndex === idx ? "Stop" : "Play"}
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            loadComponentIntoWave(idx);
+                                                        }}
+                                                    >
+                                                        Load to Wave
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            {expandedComponentIndex === idx && (
+                                                <div style={{ borderTop: "1px solid rgba(255,255,255,0.14)", paddingTop: "0.5rem" }}>
+                                                    <svg viewBox="0 0 560 140" style={{ width: "100%", height: "120px", display: "block", background: "rgba(10,20,35,0.35)", borderRadius: "6px" }}>
+                                                        <line x1="0" y1="70" x2="560" y2="70" stroke="rgba(255,255,255,0.24)" strokeWidth="1" />
+                                                        <path d={buildWavePreviewPath(component.waveform)} fill="none" stroke="#66d9ff" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                                                    </svg>
+                                                    <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", opacity: 0.85 }}>
+                                                        Reconstructed component waveform preview ({component.waveform.length.toLocaleString()} samples)
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
-
-                                    {expandedComponentIndex === idx && (
-                                        <div style={{ borderTop: "1px solid rgba(255,255,255,0.14)", paddingTop: "0.5rem" }}>
-                                            <svg viewBox="0 0 560 140" style={{ width: "100%", height: "120px", display: "block", background: "rgba(10,20,35,0.35)", borderRadius: "6px" }}>
-                                                <line x1="0" y1="70" x2="560" y2="70" stroke="rgba(255,255,255,0.24)" strokeWidth="1" />
-                                                <path d={buildWavePreviewPath(component.waveform)} fill="none" stroke="#66d9ff" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-                                            </svg>
-                                            <div style={{ marginTop: "0.35rem", fontSize: "0.8rem", opacity: 0.85 }}>
-                                                Reconstructed component waveform preview ({component.waveform.length.toLocaleString()} samples)
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                ));
+                            })()}
                         </div>
                     )}
                 </div>
