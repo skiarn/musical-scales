@@ -1,0 +1,12 @@
+.regions {
+  display: inline-block;
+  flex-direction: column;
+  width: 260px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .regions {
+    width: 100%;
+  }
+}

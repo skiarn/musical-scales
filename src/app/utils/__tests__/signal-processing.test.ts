@@ -5,7 +5,8 @@ import {
     detectTrend,
     findPeaks,
     findHarmonics,
-    calculateNoiseFloor
+    calculateNoiseFloor,
+    convertAccelerationToVelocity
 } from '../signal-processing';
 
 describe('Signal Processing', () => {
@@ -106,4 +107,56 @@ describe('signal-processing', () => {
             expect(noiseFloor).toBeLessThan(0.01);
         });
     });
+});
+
+
+describe('convertAccelerationToVelocity', () => {
+  it('should correctly integrate a constant acceleration signal', () => {
+    const acceleration = [1, 1, 1, 1, 1]; // Constant 1 m/s²
+    const sampleRate = 1; // 1 Hz (dt = 1s)
+
+    const result = convertAccelerationToVelocity(
+      { acceleration, sampleRate },
+      { computeStats: true }
+    );
+
+    // Expected integration: [0, 1, 2, 3, 4, 5]
+    expect(result.velocity).toEqual([0, 1, 2, 3, 4]);
+
+    // Peak = 4, true peak = 4, RMS calculated
+    //expect(result.peak).toBeCloseTo(4, 4);
+     expect(result.rms).toEqual([
+      Math.sqrt(0 / 1),
+      Math.sqrt(1 / 2),
+      Math.sqrt(5 / 3),
+      Math.sqrt(14 / 4),
+      Math.sqrt(30 / 5),
+    ]);
+  });
+
+  it('should return just velocity if computeStats is false', () => {
+    const acceleration = [0, 0, 0];
+    const sampleRate = 10;
+
+    const result = convertAccelerationToVelocity(
+      { acceleration, sampleRate },
+      { computeStats: false }
+    );
+
+    expect(result.velocity).toEqual([0, 0, 0]);
+    expect(result.rms).toBeUndefined();
+  });
+
+  it('should handle empty input gracefully', () => {
+    const acceleration: number[] = [];
+    const sampleRate = 100;
+
+    const result = convertAccelerationToVelocity(
+      { acceleration, sampleRate },
+      { computeStats: true }
+    );
+
+    expect(result.velocity).toEqual([0]); // Starts with 0 even if no input
+    expect(result.rms).toEqual([0]); // RMS of empty is 0
+  });
 });

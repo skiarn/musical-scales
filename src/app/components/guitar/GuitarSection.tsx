@@ -19,9 +19,10 @@ interface GuitarSectionProps {
   minFrequency?: number;
   maxFrequency?: number;
   maxPeaks?: number;
+  onNoteSelect?: (note: GuitarNote) => void;
 }
 
-export const GuitarSection: React.FC<GuitarSectionProps> = ({ fftData, minSnr, minFrequency, maxFrequency, maxPeaks }) => {
+export const GuitarSection: React.FC<GuitarSectionProps> = ({ fftData, minSnr, minFrequency, maxFrequency, maxPeaks, onNoteSelect }) => {
   const [activeNotes, setActiveNotes] = useState<
     { note: GuitarNote; timestamp: number }[]
   >([]);
@@ -41,8 +42,7 @@ export const GuitarSection: React.FC<GuitarSectionProps> = ({ fftData, minSnr, m
     const analysisResult = analyzeFrequencies(fftData, analysisOptions);
 
     // Filter peaks that have harmonics and match to guitar notes
-    const significantPeaks = analysisResult.peaks
-      .filter(peak => peak.harmonics.length >= 1) // Only keep peaks with harmonics
+    const significantPeaks = analysisResult.peaks.slice(0,3)
       .map(peak => {
         const closestNote = findClosestGuitarNote(peak.frequency);
         return {
@@ -53,14 +53,7 @@ export const GuitarSection: React.FC<GuitarSectionProps> = ({ fftData, minSnr, m
           timestamp: now,
           harmonicCount: peak.harmonics.length
         };
-      })
-      // Sort by number of harmonics and amplitude
-      .sort((a, b) => 
-        (b.harmonicCount - a.harmonicCount) || 
-        (b.note.amplitude - a.note.amplitude)
-      )
-      // Take the top 3 most likely notes
-      .slice(0, 3);
+      });
 
     setActiveNotes(significantPeaks);
   }, [fftData, analysisOptions]); // Stable dependency array
@@ -71,11 +64,14 @@ export const GuitarSection: React.FC<GuitarSectionProps> = ({ fftData, minSnr, m
       <GuitarNoteSelector
         activeNotes={activeNotes.map((n) => n.note)}
         frequencyTolerance={5}
+        onNoteSelect={(note) => {
+          onNoteSelect?.(note);
+        }}
       />
       <GuitarNoteTable
          highlightFrequencies={activeNotes.map((n)=> n.note.frequency)} // Optional: frequencies to highlight
          toleranceHz={1}   
-      />
+        />
     </div>
   );
 };

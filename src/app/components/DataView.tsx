@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from "react";
-import WaveView, { FuncFilter, FuncZoom } from "./visualization/WaveView";
+import WaveView, { FuncFilter, FuncTransform, FuncZoom } from "./visualization/WaveView";
 import AudioRecorder from "./audio/AudioRecorder";
 import FFTView from "./visualization/FFTWaveView";
 import "./DataView.css";
@@ -11,16 +11,37 @@ import FrequencyAnalyzer from "./analysis/FrequencyAnalyzer";
 interface DataViewProps {
   data: { x: number; y: number }[];
   sampleRate: number;
-  setNewData: (data: { x: number; y: number }[], sampleRate: number) => void;
+  setNewData: (data: Float32Array<ArrayBufferLike>, sampleRate: number) => void;
+  onTransform: (transformation: string, enabled: boolean, funcTransform: FuncTransform<{ x: number; y: number }>) => void;
   onWindowFilterChange: (window: string, enabled: boolean, funcWindow: FuncFilter<{ x: number; y: number }>) => void;
   onZoomChange?: (reset: boolean, from: number, to: number, funcZoom: FuncZoom<{ x: number; y: number }>) => void;
 }
 
-const DataView: React.FC <DataViewProps> = ({ data, sampleRate, setNewData, onWindowFilterChange, onZoomChange }) => {
-const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
+async function loadAudioFileToData(url: string, setNewData: (data: Float32Array<ArrayBufferLike>, sampleRate: number) => void) {
+  const response = await fetch(url);
+  const arrayBuffer = await response.arrayBuffer();
+  const audioCtx = new (window.AudioContext || (window as Window).webkitAudioContext)();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+  // Use the first channel (mono)
+  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+
+  setNewData(channelData, sampleRate);
+}
+
+const DataView: React.FC <DataViewProps> = ({ data, sampleRate, setNewData, onWindowFilterChange, onZoomChange, onTransform }) => {
+
+const defaultMaxFreq = useMemo(() => {
+        if (!data || data.length === 0) return sampleRate / 2;
+        const N = Math.max(1, data.length);
+        const paddedLength = 2 ** Math.ceil(Math.log2(N));
+        const lastBinIdx = paddedLength / 2 - 1;
+        return lastBinIdx * sampleRate / paddedLength;
+    }, [data, sampleRate]);
 
   const [dataFFT, setDataFFT] = useState<{ x: number; y: number }[]>([]);
-  const [maxFreq, setMaxFreq] = useState(DEFAULT_MAX_FREQ);
+  const [maxFreq, setMaxFreq] = useState(defaultMaxFreq);
   const [minFreq, setMinFreq] = useState(0);
 
   const worker = useMemo(() => {
@@ -60,12 +81,8 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
       "Sample rate:",
       sampleRate
     );
-    const audioData = Array.from(channelData).map((value, index) => ({
-      x: index / sampleRate,
-      y: value,
-    }));
-    
-    setNewData(audioData, sampleRate); 
+
+    setNewData(channelData, sampleRate); 
   };
 
 
@@ -76,8 +93,32 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
 
   return (
     <div>
+      <GuitarSection fftData={dataFFT} minSnr={3} onNoteSelect={(note) => {
+        console.log("Selected note:", note);
+        
+        const url = `${process.env.basePath}/data/guitar/S${note.string}-${note.fret}.m4a`;
+        loadAudioFileToData(url, setNewData);
+
+        if (note.fret <= 9) {
+          const audio = new Audio(url);
+          audio.play();
+          console.log("Playing note:", note);
+        }
+      }
+      } />
+      <AudioRecorder onStop={handleAudioStop} />
       <h1>Wave Plot</h1>
        <WaveView data={data}
+       onTransform={(transformation, enabled, funcTransform) => {
+        console.log("Transformation function applied");
+        console.log("Transformation:", transformation, "Enabled:", enabled);
+        if (transformation === 'velocity') {
+          // Handle velocity transformation
+          if(onTransform) {
+            onTransform(transformation, enabled, funcTransform);
+          }
+        }
+       }}
        onZoom={(reset, from, to, funcZoom) => {
         console.log("Zoom function applied");
         if (onZoomChange) {
@@ -89,7 +130,7 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
         onWindowFilterChange(window, enabled, funcWindow);
        }} options={{filter: {windows: ["hanning"]}}}/>
       <FrequencyFilter
-        defaultMaxFreq={DEFAULT_MAX_FREQ}
+        defaultMaxFreq={defaultMaxFreq}
         data={data}
         sampleRate={sampleRate}
         onFilterChange={filterChange}
@@ -97,7 +138,9 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
 
       <h1>FFT Plot</h1>
       <span>Min:{minFreq} Max:{maxFreq}</span>
-      <FFTView data={dataFFT.slice(minFreq, maxFreq)} />
+      <FFTView data={
+        dataFFT.filter(point => point.x >= minFreq && point.x <= maxFreq)
+      } />
 
       <FrequencyAnalyzer
         fftData={dataFFT}
@@ -107,9 +150,6 @@ const DEFAULT_MAX_FREQ = sampleRate / 2; // Nyquist frequency
         maxPeaks={10}
       />
 
-      <GuitarSection fftData={dataFFT} minSnr={3}></GuitarSection>
-
-      <AudioRecorder onStop={handleAudioStop} />
       {/*       
       <FrequencyBandAnalysis
         analysis={dataFFT.map((point, index) => ({

@@ -1,0 +1,51 @@
+.collapsible {
+  margin-bottom: 1rem;
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(145deg, #f9f9f9, #e8e8e8);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+/* Collapsible button */
+.collapsible-btn {
+  width: 100%;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 1rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.collapsible-btn:hover {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+}
+
+/* Arrow indicator */
+.arrow {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.arrow.open {
+  transform: rotate(90deg);
+}
+
+.collapsible-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease, padding 0.4s ease;
+  padding: 0 1rem;
+}
+
+.collapsible-content.open {
+  max-height: 1000px; /* should be larger than your content height */
+  padding: 0.5rem 1rem 1rem 1rem;
+}

@@ -7,6 +7,12 @@ type AudioPlayButtonProps = {
 const AudioPlayButton: React.FC<AudioPlayButtonProps> = ({ audioSrc }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audio] = useState(new Audio(audioSrc));
+  
+  useEffect(() => {
+    audio.src = audioSrc;
+    audio.load();
+    setIsPlaying(false); // Reset playing state when source changes
+  }, [audioSrc, audio]);
 
   useEffect(() => {
     const handleEnded = () => {
@@ -31,9 +37,11 @@ const AudioPlayButton: React.FC<AudioPlayButtonProps> = ({ audioSrc }) => {
   };
 
   return (
+    <>  
     <button onClick={togglePlay} className={`audio-play-button ${isPlaying ? 'playing' : ''}`}>
       {isPlaying ? 'Pause' : 'Play'}
     </button>
+    </>
   );
 };
 

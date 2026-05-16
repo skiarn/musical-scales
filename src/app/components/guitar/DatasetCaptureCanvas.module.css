@@ -1,0 +1,26 @@
+.canvasWrapper {
+  width: 100%;         /* make canvas wrapper stretch */
+  overflow-x: auto;    /* optional: allow scroll if really wide */
+}
+.canvas {
+  cursor: grab;
+  touch-action: none; /* disables scroll & pinch zoom on browser */
+  width: 100%;         /* canvas fills wrapper width */
+  height: auto;        /* keep aspect ratio */
+  max-width: 100%;     /* prevent overflow */
+  display: block;
+}
+
+.canvas:active {
+  cursor: grabbing;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .canvas {
+    height: 30%;
+  }
+  .regions {
+    width: 100%;
+  }
+}

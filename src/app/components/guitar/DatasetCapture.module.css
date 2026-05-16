@@ -1,0 +1,43 @@
+.container {
+  border-left: 1px solid #eee;
+  padding-left: 12px;
+  padding-right: 12px; /* add right padding for symmetry */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 100%;     /* ensure it never exceeds viewport */
+  box-sizing: border-box; /* include padding in width */
+  overflow-x: hidden;  /* prevent accidental horizontal scroll */
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.main {
+  gap: 12px;
+  margin-top: 6px;
+  width: 100%;         /* make it fill container */
+  box-sizing: border-box;
+}
+
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .container {
+    border-left: none;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .controls .input,
+  .controls .btn {
+    width: 100%;
+  }
+}

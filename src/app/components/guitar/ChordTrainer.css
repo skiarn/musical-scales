@@ -1,0 +1,165 @@
+.trainer-container {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  font-family: sans-serif;
+}
+
+.trainer-title {
+  font-size: 1.8rem;
+  font-weight: bold;
+}
+
+.card {
+  width: 100%;
+  max-width: 500px;
+  background: #fff;
+  border-radius: 1rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.card-content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Input styling */
+.input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  width: 250px; /* adjust as needed */
+}
+
+.label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+  display: block;
+}
+
+.btn {
+  margin-top: 0.5rem;
+  margin-left: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--primary-button);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.btn:hover {
+  background: var(--button-primary-hover);
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: #ef4444;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.remove-btn:hover {
+  color: #dc2626;
+}
+
+.sequence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sequence-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f3f4f6;
+  border-radius: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  transition: background 0.2s ease;
+}
+
+.sequence-item.active {
+  background: #dbeafe;
+  border: 2px solid #2563eb;
+}
+
+.suggestions {
+  position: absolute;
+  top: 0;
+  left: 100%; /* position to the right of the input */
+  margin-left: 0.5rem;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  padding: 0.25rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.suggestion-item:hover {
+  background-color: #f3f4f6;
+}
+
+.suggestion-item svg {
+  width: 40px; /* small preview */
+  height: 50px;
+}
+
+.chord-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  width: 100%;
+  height: 160px;
+  position: relative;
+}
+
+.chord-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chord-name {
+  font-size: 1rem;
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+}
+
+.relative {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.input-group {
+  position: relative;
+}

@@ -33,8 +33,8 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
   };
 
   const isNoteActive = (note: GuitarNote) => {
-    return activeNotes.some(active => 
-      active.string === note.string && 
+    return activeNotes.some(active =>
+      active.string === note.string &&
       active.fret === note.fret
     );
   };
@@ -57,10 +57,10 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
       <svg width={SVG_WIDTH} height={SVG_HEIGHT}>
         {/* Background */}
         <rect x={FRET_START} y={20} width={SVG_WIDTH - FRET_START} height={SVG_HEIGHT - 40} fill="#f8d49c" />
-        
+
         {/* Nut */}
         <rect x={FRET_START} y={20} width={4} height={SVG_HEIGHT - 40} fill="#444" />
-        
+
         {/* Frets */}
         {Array.from({ length: FRETS + 1 }).map((_, i) => (
           <line
@@ -73,10 +73,10 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
             strokeWidth={2}
           />
         ))}
-        
+
         {/* Fret markers */}
         {renderFretMarkers()}
-        
+
         {/* Strings */}
         {Array.from({ length: STRINGS }).map((_, i) => (
           <line
@@ -89,14 +89,14 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
             strokeWidth={2 + (STRINGS - i) * 0.5}
           />
         ))}
-        
+
         {/* Notes */}
         {Object.values(guitarNotes).flat().map((note) => {
           const isHighlighted = isNoteHighlighted(note);
           const isActive = isNoteActive(note);
           const x = FRET_START + (note.fret * FRET_WIDTH) - (FRET_WIDTH / 2);
-          const y = STRING_SPACING * note.string;
-          
+          // Reverse string order for y so string 6 is at the top
+          const y = STRING_SPACING * (STRINGS - note.string + 1);
           return (
             <g
               key={`note-${note.string}-${note.fret}`}
@@ -107,7 +107,7 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
                 cx={x}
                 cy={y}
                 r={12}
-                fill={isActive ? '#4CAF50' : isHighlighted ? '#4CAF50' : 'white'}
+                fill={isActive ? 'var(--green-accent)' : isHighlighted ? 'var(--green-accent)' : 'white'}
                 stroke="#333"
                 strokeWidth={1}
                 className={isActive ? 'note-highlight' : ''}
@@ -125,7 +125,7 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
             </g>
           );
         })}
-        
+
         {/* String labels */}
         {Array.from({ length: STRINGS }).map((_, i) => (
           <text
@@ -137,7 +137,7 @@ const GuitarNoteSelector: React.FC<GuitarNoteSelectorProps> = ({
             fontSize={14}
             fontWeight="bold"
           >
-            {guitarNotes[i+1][0].note}
+            {guitarNotes[i + 1][0].note}
           </text>
         ))}
       </svg>

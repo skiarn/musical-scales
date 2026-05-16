@@ -1,0 +1,50 @@
+.guitar-note-table {
+  margin: 20px 0;
+}
+
+.guitar-note-table h3 {
+  margin-bottom: 4px;
+}
+
+.guitar-note-table p {
+  margin-bottom: 8px;
+}
+
+.table-container {
+  overflow-x: auto;
+  max-width: 100%;
+  margin-top: 10px;
+}
+
+.guitar-note-table table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.guitar-note-table th,
+.guitar-note-table td {
+  border: 1px solid #ddd;
+  padding: 4px 8px;
+  text-align: center;
+  color: var(--text-primary)
+}
+
+.guitar-note-table th {
+  background-color: var(--foreground);
+}
+
+.guitar-note-table td.highlighted {
+  background-color: var(--green-accent);
+}
+
+.guitar-note-table td div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--text-primary);
+}
+
+.guitar-note-table td small {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
